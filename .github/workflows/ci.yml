@@ -8,15 +8,14 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: "1.90"
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --all --check
-      - run: cargo clippy --all-targets --locked -- -D warnings
-      - run: cargo test --locked
+      - uses: cachix/install-nix-action@v31
+      - name: Build Abla compiler
+        run: |
+          git clone --depth 1 https://github.com/AndreBaltazar8/ablac "$RUNNER_TEMP/ablac"
+          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac' bootstrap"
+      - name: Test and build CLI
+        run: make test build ABLAC_DIR="$RUNNER_TEMP/ablac" COMPILER="$RUNNER_TEMP/ablac/build/ablac"

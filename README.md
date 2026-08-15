@@ -4,10 +4,10 @@
 
 ## Install from source
 
-Rust 1.90 or newer is required.
+Install the [Abla compiler](https://github.com/AndreBaltazar8/ablac), then:
 
 ```sh
-cargo install --path .
+make install
 micro login
 ```
 
@@ -28,9 +28,7 @@ Function names are DNS labels: 3–63 lowercase letters, digits, or interior hyp
 ## Development
 
 ```sh
-cargo fmt --all --check
-cargo clippy --all-targets -- -D warnings
-cargo test
+make test build
 ```
 
 Set `MICRO_API=http://127.0.0.1:8080` to work against a local server. Plain HTTP is rejected for non-loopback API addresses.

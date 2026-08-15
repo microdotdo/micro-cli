@@ -1,0 +1,243 @@
+import "abla/crypto"
+import "abla/fs"
+import "abla/http"
+import "abla/http/tls"
+import "abla/json"
+import "abla/random"
+import "abla/sys/linux"
+import "abla/sys/linux/io"
+
+class MicroApi(
+    val valid: bool,
+    val secure: bool,
+    val host: string,
+    val port: int,
+    val origin: string,
+    val message: string
+)
+
+class MicroCredentials(
+    val valid: bool,
+    val accessToken: string,
+    val refreshToken: string
+)
+
+class MicroResult(
+    val succeeded: bool,
+    val message: string
+)
+
+class MicroHttpResult(
+    val succeeded: bool,
+    val response: HttpResponse,
+    val message: string
+)
+
+fun microBase64UrlEncode(value: string): string {
+    val encoded = base64Encode(value)
+    var result = ""
+    var index = 0
+    while (index < encoded.size && encoded[index] != 61) {
+        if (encoded[index] == 43) result = "${result}-"
+        else if (encoded[index] == 47) result = "${result}_"
+        else result = "$result${encoded.slice(index, index + 1)}"
+        index = index + 1
+    }
+    result
+}
+
+fun microRandomToken(bytes: int): string {
+    val entropy = secureRandomBytes(bytes)
+    if (entropy.succeeded) microBase64UrlEncode(entropy.bytes) else ""
+}
+
+fun microParsePort(value: string, fallback: int): int {
+    var parsed = 0
+    var valid = value.size > 0
+    var index = 0
+    while (valid && index < value.size) {
+        val digit = value[index] - 48
+        if (digit < 0 || digit > 9) valid = false
+        else parsed = parsed * 10 + digit
+        index = index + 1
+    }
+    if (valid && parsed > 0 && parsed <= 65535) parsed else fallback
+}
+
+fun microParseApi(value: string): MicroApi {
+    var origin = value
+    while (origin.size > 0 && origin[origin.size - 1] == 47)
+        origin = origin.slice(0, origin.size - 1)
+    var secure = false
+    var authorityBegin = -1
+    if (origin.size > 8 && origin.slice(0, 8) == "https://") {
+        secure = true
+        authorityBegin = 8
+    } else if (origin.size > 7 && origin.slice(0, 7) == "http://") {
+        authorityBegin = 7
+    }
+    var valid = authorityBegin >= 0 && authorityBegin < origin.size
+    var colon = -1
+    var index = if (authorityBegin >= 0) authorityBegin else 0
+    while (valid && index < origin.size) {
+        if (origin[index] == 47 || origin[index] == 63 || origin[index] == 35 ||
+            origin[index] == 64) valid = false
+        if (origin[index] == 58) {
+            if (colon >= 0) valid = false
+            colon = index
+        }
+        index = index + 1
+    }
+    val hostEnd = if (colon >= 0) colon else origin.size
+    val host = if (valid) origin.slice(authorityBegin, hostEnd) else ""
+    val defaultPort = if (secure) 443 else 80
+    val port = if (colon >= 0) microParsePort(origin.slice(colon + 1, origin.size), -1)
+        else defaultPort
+    val local = host == "127.0.0.1" || host == "localhost"
+    valid = valid && host != "" && port > 0 && (secure || local)
+    MicroApi(
+        valid, secure, host, port, origin,
+        if (valid) "" else "API URL must use HTTPS (HTTP is allowed only for localhost)."
+    )
+}
+
+fun MicroApi.client(maximumResponseBytes: int = 1048576): HttpClient {
+    if (this.secure) httpsClient(this.host, this.port, maximumResponseBytes, 10000)
+    else httpIpv4Client(
+        if (this.port == 80) this.host else "${this.host}:${this.port}",
+        if (this.host == "localhost") "127.0.0.1" else this.host,
+        this.port,
+        maximumResponseBytes,
+        10000
+    )
+}
+
+fun microResponseMessage(response: HttpResponse): string {
+    val parsed = jsonParse(response.body)
+    if (parsed.succeeded && parsed.value.isObject() && parsed.value.getString("message") != "")
+        parsed.value.getString("message")
+    else if (response.body != "") response.body else "request failed"
+}
+
+fun microChecked(result: HttpClientResult): MicroHttpResult {
+    if (!result.succeeded || !result.complete)
+        MicroHttpResult(false, result.response, "Could not reach micro.do.")
+    else if (result.response.status < 200 || result.response.status >= 300) {
+        val prefix = if (result.response.status == 401) "Not authorized: "
+            else "micro.do returned ${result.response.status}: "
+        MicroHttpResult(false, result.response, "$prefix${microResponseMessage(result.response)}")
+    } else MicroHttpResult(true, result.response, "")
+}
+
+fun microRequest(
+    api: MicroApi,
+    method: string,
+    endpoint: string,
+    body: string = "",
+    contentType: string = "application/json",
+    bearer: string = "",
+    maximumResponseBytes: int = 1048576
+): MicroHttpResult {
+    val headers: array<HttpHeader> = [
+        HttpHeader("User-Agent", "micro-cli/0.1.0"),
+        HttpHeader("Content-Type", contentType)
+    ]
+    if (bearer != "") headers.append(HttpHeader("Authorization", "Bearer $bearer"))
+    microChecked(api.client(maximumResponseBytes).send(
+        httpRequest(method, endpoint, body, headers)
+    ))
+}
+
+fun microSlugValid(value: string): bool {
+    var valid = value.size >= 3 && value.size <= 63
+    var index = 0
+    while (valid && index < value.size) {
+        val byte = value[index]
+        if (!((byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) ||
+            (byte == 45 && index > 0 && index + 1 < value.size))) valid = false
+        index = index + 1
+    }
+    val reserved = value == "api" || value == "auth" || value == "autoconfig" ||
+        value == "autodiscover" || value == "cli" || value == "mail" ||
+        value == "micro" || value == "runner" || value == "status" || value == "www"
+    valid && !reserved
+}
+
+fun microQueryParameter(request: HttpRequest, name: string): string {
+    var result = ""
+    var begin = 0
+    var cursor = 0
+    while (cursor <= request.query.size) {
+        if (cursor == request.query.size || request.query[cursor] == 38) {
+            var equals = begin
+            while (equals < cursor && request.query[equals] != 61) equals = equals + 1
+            if (equals < cursor && request.query.slice(begin, equals) == name)
+                result = request.query.slice(equals + 1, cursor)
+            begin = cursor + 1
+        }
+        cursor = cursor + 1
+    }
+    result
+}
+
+fun microCredentialsPath(): Path {
+    val configured = linuxEnvironment("XDG_CONFIG_HOME")
+    val home = linuxEnvironment("HOME")
+    val root = if (configured.found && configured.value != "") configured.value
+        else if (home.found && home.value != "") "${home.value}/.config"
+        else "."
+    path("$root/micro-cli/credentials.json")
+}
+
+fun microLoadCredentials(): MicroCredentials {
+    val contents = microCredentialsPath().readText()
+    val parsed = jsonParse(contents)
+    if (parsed.succeeded && parsed.value.isObject()) {
+        val access = parsed.value.getString("access_token")
+        val refresh = parsed.value.getString("refresh_token")
+        MicroCredentials(access != "" && refresh != "", access, refresh)
+    } else MicroCredentials(false, "", "")
+}
+
+fun microSaveCredentials(credentials: MicroCredentials): bool {
+    val target = microCredentialsPath()
+    var succeeded = target.createParentDirectories()
+    if (succeeded) succeeded = linuxSyscall2(
+        90, nativeCStringAddress(target.parent().text), 448
+    ) == 0
+    var descriptor = -1
+    if (succeeded) descriptor = linuxOpen(target.text, 577, 384).descriptor
+    val encoded = jsonStringify(jsonObject(
+        ["access_token", "refresh_token"],
+        [jsonString(credentials.accessToken), jsonString(credentials.refreshToken)]
+    ))
+    if (descriptor < 0) succeeded = false
+    if (succeeded) succeeded = linuxWriteAll(descriptor, encoded)
+    if (descriptor >= 0) linuxSyscall1(3, descriptor)
+    if (succeeded) succeeded = linuxSyscall2(
+        90, nativeCStringAddress(target.text), 384
+    ) == 0
+    succeeded
+}
+
+fun microRefreshCredentials(api: MicroApi): MicroCredentials {
+    val stored = microLoadCredentials()
+    var refreshed = MicroCredentials(false, "", "")
+    if (stored.valid) {
+        val response = microRequest(
+            api, "POST", "/api/v1/auth/refresh", "", "application/json",
+            stored.refreshToken
+        )
+        if (response.succeeded) {
+            val parsed = jsonParse(response.response.body)
+            if (parsed.succeeded && parsed.value.isObject()) {
+                val access = parsed.value.getString("access_token")
+                val refresh = parsed.value.getString("refresh_token")
+                refreshed = MicroCredentials(access != "" && refresh != "", access, refresh)
+                if (refreshed.valid && !microSaveCredentials(refreshed))
+                    refreshed = MicroCredentials(false, "", "")
+            }
+        }
+    }
+    refreshed
+}

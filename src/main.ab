@@ -1,0 +1,157 @@
+import "core.ab"
+
+fun microUsage(): string = "micro 0.1.0\n\nDeploy small WebAssembly functions to micro.do\n\nUsage:\n  micro [--api URL] login\n  micro [--api URL] logout\n  micro [--api URL] deploy <slug> <module.wasm>\n  micro [--api URL] functions\n"
+
+fun microLogin(api: MicroApi): MicroResult {
+    var listener = tcpListenAddress(ipv4SocketAddress("127.0.0.1", 0), 8)
+    if (listener.descriptor < 0) return MicroResult(false, "Could not open the loopback callback server.")
+    val port = listener.localPort()
+    val state = microRandomToken(32)
+    val verifier = microRandomToken(48)
+    val challenge = microBase64UrlEncode(sha256(verifier))
+    if (port <= 0 || state == "" || verifier == "") {
+        listener.close()
+        return MicroResult(false, "Could not create secure pairing state.")
+    }
+    val redirect = "http://127.0.0.1:$port/callback"
+    val started = microRequest(
+        api, "POST", "/api/v1/cli/pair/start",
+        jsonStringify(jsonObject(
+            ["state", "code_challenge", "redirect_uri"],
+            [jsonString(state), jsonString(challenge), jsonString(redirect)]
+        ))
+    )
+    if (!started.succeeded) {
+        listener.close()
+        return MicroResult(false, started.message)
+    }
+    val parsed = jsonParse(started.response.body)
+    val pairingId = if (parsed.succeeded) parsed.value.getString("pairing_id") else ""
+    val authorizeUrl = if (parsed.succeeded) parsed.value.getString("authorize_url") else ""
+    if (pairingId == "" || authorizeUrl == "") {
+        listener.close()
+        return MicroResult(false, "micro.do returned an invalid pairing response.")
+    }
+    linuxWriteStandardOutputAll("Opening $authorizeUrl\n")
+    if (linuxCommand("xdg-open").argument(authorizeUrl).run() != 0)
+        linuxWriteStandardOutputAll("Open that URL in your browser to continue.\n")
+    val readiness = linuxPollSocket(listener.descriptor, true, false, 300000)
+    if (!readiness.readable) {
+        listener.close()
+        return MicroResult(false, "Browser authorization timed out.")
+    }
+    val connection = listener.accept()
+    listener.close()
+    if (connection.descriptor < 0) return MicroResult(false, "Could not accept the browser callback.")
+    val callback = httpParseRequest(httpReadRequest(connection, 8192, 0))
+    val callbackState = microQueryParameter(callback, "state")
+    val callbackPairing = microQueryParameter(callback, "pairing_id")
+    val code = microQueryParameter(callback, "code")
+    val callbackValid = callback.path == "/callback" && callbackState == state &&
+        callbackPairing == pairingId && code != ""
+    val callbackBody = if (callbackValid)
+        "<!doctype html><title>micro CLI paired</title><p>You can close this window and return to the terminal.</p>"
+        else "<!doctype html><title>micro CLI pairing failed</title><p>The callback did not match this pairing request.</p>"
+    val callbackResponse = HttpResponse(
+        if (callbackValid) 200 else 400,
+        [HttpHeader("Content-Type", "text/html; charset=utf-8")],
+        callbackBody
+    )
+    connection.write(callbackResponse.render())
+    connection.close()
+    if (!callbackValid) return MicroResult(false, "Browser callback state did not match.")
+    val exchanged = microRequest(
+        api, "POST", "/api/v1/cli/pair/exchange",
+        jsonStringify(jsonObject(
+            ["pairing_id", "state", "code", "code_verifier"],
+            [jsonString(pairingId), jsonString(state), jsonString(code), jsonString(verifier)]
+        ))
+    )
+    if (!exchanged.succeeded) return MicroResult(false, exchanged.message)
+    val tokens = jsonParse(exchanged.response.body)
+    val credentials = if (tokens.succeeded) MicroCredentials(
+        tokens.value.getString("access_token") != "" && tokens.value.getString("refresh_token") != "",
+        tokens.value.getString("access_token"), tokens.value.getString("refresh_token")
+    ) else MicroCredentials(false, "", "")
+    if (!credentials.valid || !microSaveCredentials(credentials))
+        MicroResult(false, "Could not securely save the paired credentials.")
+    else MicroResult(true, "Paired with micro.do.")
+}
+
+fun microLogout(): MicroResult {
+    val target = microCredentialsPath()
+    if (!target.exists()) MicroResult(true, "Already logged out.")
+    else if (target.remove()) MicroResult(true, "Removed local micro.do credentials.")
+    else MicroResult(false, "Could not remove local credentials.")
+}
+
+fun microDeploy(api: MicroApi, slug: string, fileName: string): MicroResult {
+    if (!microSlugValid(slug))
+        return MicroResult(false, "Slug must contain 3-63 lowercase letters, digits, or interior hyphens and must not be reserved.")
+    val artifactPath = path(fileName)
+    val artifact = artifactPath.readText()
+    if (!artifactPath.exists() || artifact == "")
+        return MicroResult(false, "Could not read $fileName.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val deployed = microRequest(
+        api, "PUT", "/api/v1/functions/$slug", artifact, "application/wasm",
+        credentials.accessToken, 1048576
+    )
+    if (!deployed.succeeded) return MicroResult(false, deployed.message)
+    val parsed = jsonParse(deployed.response.body)
+    if (!parsed.succeeded || !parsed.value.isObject())
+        return MicroResult(false, "micro.do returned an invalid deployment response.")
+    val url = parsed.value.getString("url")
+    val deployment = parsed.value.getString("deployment_id")
+    val digest = parsed.value.getString("artifact_sha256")
+    MicroResult(true, "$url\ndeployment $deployment · sha256 $digest")
+}
+
+fun microFunctions(api: MicroApi): MicroResult {
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "GET", "/api/v1/functions", "", "application/json",
+        credentials.accessToken
+    )
+    if (response.succeeded) MicroResult(true, response.response.body)
+    else MicroResult(false, response.message)
+}
+
+fun microRun(): MicroResult {
+    val count = linuxArgumentCount()
+    var apiValue = "https://micro.do"
+    val configured = linuxEnvironment("MICRO_API")
+    if (configured.found && configured.value != "") apiValue = configured.value
+    var index = 0
+    if (index < count && linuxArgument(index) == "--api") {
+        if (index + 1 >= count) return MicroResult(false, "--api requires a URL.\n${microUsage()}")
+        apiValue = linuxArgument(index + 1)
+        index = index + 2
+    }
+    if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
+        return MicroResult(true, microUsage())
+    if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
+        return MicroResult(true, "micro 0.1.0")
+    val api = microParseApi(apiValue)
+    if (!api.valid) return MicroResult(false, api.message)
+    val command = linuxArgument(index)
+    if (command == "login" && index + 1 == count) microLogin(api)
+    else if (command == "logout" && index + 1 == count) microLogout()
+    else if (command == "functions" && index + 1 == count) microFunctions(api)
+    else if (command == "deploy" && index + 3 == count)
+        microDeploy(api, linuxArgument(index + 1), linuxArgument(index + 2))
+    else MicroResult(false, "Invalid command.\n${microUsage()}")
+}
+
+fun main: int {
+    val result = microRun()
+    if (result.succeeded) {
+        linuxWriteStandardOutputAll("${result.message}\n")
+        0
+    } else {
+        linuxWriteStandardErrorAll("micro: ${result.message}\n")
+        1
+    }
+}
