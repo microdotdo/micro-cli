@@ -189,6 +189,9 @@ fun microCredentialsPath(): Path {
     path("$root/micro-cli/credentials.json")
 }
 
+fun microCredentialsLockPath(): Path =
+    microCredentialsPath().parent().child("credentials.lock")
+
 fun microLoadCredentials(): MicroCredentials {
     val contents = microCredentialsPath().readText()
     val parsed = jsonParse(contents)
@@ -221,9 +224,18 @@ fun microSaveCredentials(credentials: MicroCredentials): bool {
 }
 
 fun microRefreshCredentials(api: MicroApi): MicroCredentials {
-    val stored = microLoadCredentials()
     var refreshed = MicroCredentials(false, "", "")
-    if (stored.valid) {
+    val lockPath = microCredentialsLockPath()
+    val parentReady = lockPath.createParentDirectories()
+    val lock = if (parentReady) linuxOpen(lockPath.text, 66, 384).descriptor
+        else -1
+    // Refresh tokens rotate on every use. A process-level advisory lock makes
+    // concurrent CLI invocations load the newest token after the preceding
+    // invocation has atomically saved it.
+    val locked = lock >= 0 && linuxSyscall2(73, lock, 2) == 0
+    val stored = if (locked) microLoadCredentials()
+        else MicroCredentials(false, "", "")
+    if (locked && stored.valid) {
         val response = microRequest(
             api, "POST", "/api/v1/auth/refresh", "", "application/json",
             stored.refreshToken
@@ -239,5 +251,7 @@ fun microRefreshCredentials(api: MicroApi): MicroCredentials {
             }
         }
     }
+    if (locked) linuxSyscall2(73, lock, 8)
+    if (lock >= 0) linuxSyscall1(3, lock)
     refreshed
 }
