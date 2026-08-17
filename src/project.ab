@@ -15,6 +15,179 @@ class MicroFileCollection(
     val message: string
 )
 
+class MicroProductDefinitions(
+    val succeeded: bool,
+    val slug: string,
+    val apiProducts: Json,
+    val bundleProducts: Json,
+    val message: string
+)
+
+fun microTrim(value: string): string {
+    var begin = 0
+    var end = value.size
+    while (begin < end && (value[begin] == 32 || value[begin] == 9 ||
+        value[begin] == 13)) begin = begin + 1
+    while (end > begin && (value[end - 1] == 32 || value[end - 1] == 9 ||
+        value[end - 1] == 13)) end = end - 1
+    value.slice(begin, end)
+}
+
+fun microYamlScalar(value: string): string {
+    val trimmed = microTrim(value)
+    if (trimmed.size >= 2 &&
+        ((trimmed[0] == 34 && trimmed[trimmed.size - 1] == 34) ||
+         (trimmed[0] == 39 && trimmed[trimmed.size - 1] == 39)))
+        trimmed.slice(1, trimmed.size - 1)
+    else trimmed
+}
+
+fun microPositiveInteger(value: string): int {
+    var result = 0
+    var valid = value != ""
+    var index = 0
+    while (valid && index < value.size) {
+        val digit = value[index] - 48
+        if (digit < 0 || digit > 9 || result > 214748364) valid = false
+        else result = result * 10 + digit
+        index = index + 1
+    }
+    if (valid && result > 0) result else 0
+}
+
+fun microProductIdValid(value: string): bool {
+    var valid = value.size >= 2 && value.size <= 64
+    var index = 0
+    while (valid && index < value.size) {
+        val byte = value[index]
+        if (!((byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) ||
+            (byte == 45 && index > 0 && index + 1 < value.size))) valid = false
+        index = index + 1
+    }
+    valid
+}
+
+fun microConfiguredProduct(
+    id: string,
+    name: string,
+    description: string,
+    price: int,
+    currency: string,
+    productType: string,
+    entitlement: string,
+    mode: string,
+    bundle: bool
+): Json {
+    if (bundle) jsonObject(
+        ["id", "name", "amount", "currency", "product_type", "entitlement"],
+        [jsonString(id), jsonString(name), jsonInteger(price), jsonString(currency),
+         jsonString(productType), jsonString(entitlement)]
+    ) else jsonObject(
+        ["id", "name", "description", "price", "currency", "type", "entitlement", "mode"],
+        [jsonString(id), jsonString(name), jsonString(description), jsonInteger(price),
+         jsonString(currency), jsonString(productType), jsonString(entitlement), jsonString(mode)]
+    )
+}
+
+fun microProductDefinitions(root: Path): MicroProductDefinitions {
+    val sourcePath = root.child("micro.yaml")
+    if (!sourcePath.exists())
+        return MicroProductDefinitions(true, "", jsonArray([]), jsonArray([]), "")
+    val source = sourcePath.readText()
+    if (source.size > 262144)
+        return MicroProductDefinitions(false, "", jsonArray([]), jsonArray([]), "micro.yaml exceeds 256 KiB.")
+    val apiProducts: array<Json> = []
+    val bundleProducts: array<Json> = []
+    val ids: array<string> = []
+    var slug = ""
+    var inProducts = false
+    var productId = ""
+    var productName = ""
+    var description = ""
+    var price = 0
+    var currency = ""
+    var productType = "one_time"
+    var entitlement = ""
+    var mode = "test"
+    var error = ""
+    var cursor = 0
+    while (cursor <= source.size && error == "") {
+        var end = cursor
+        while (end < source.size && source[end] != 10) end = end + 1
+        val line = microTrim(source.slice(cursor, end))
+        cursor = end + 1
+        if (line != "" && line[0] != 35) {
+            var separator = 0
+            while (separator < line.size && line[separator] != 58) separator = separator + 1
+            if (separator >= line.size) {
+                error = "micro.yaml contains a line without a key/value separator."
+            } else {
+                var key = microTrim(line.slice(0, separator))
+                if (key.size > 2 && key.slice(0, 2) == "- ") key = microTrim(key.slice(2, key.size))
+                val value = microYamlScalar(line.slice(separator + 1, line.size))
+                val startsProduct = line.size >= 2 && line.slice(0, 2) == "- "
+                if (startsProduct) {
+                    if (productId != "") {
+                        var duplicate = false
+                        var idIndex = 0
+                        while (idIndex < ids.size) {
+                            if (ids[idIndex] == productId) duplicate = true
+                            idIndex = idIndex + 1
+                        }
+                        if (!microProductIdValid(productId) || productName == "" || price <= 0 ||
+                            currency.size != 3 || (productType != "one_time" && productType != "subscription") ||
+                            (mode != "test" && mode != "live") || duplicate) {
+                            error = "micro.yaml contains an invalid or duplicate product."
+                        } else {
+                            ids.append(productId)
+                            apiProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false))
+                            bundleProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true))
+                        }
+                    }
+                    productId = ""
+                    productName = ""
+                    description = ""
+                    price = 0
+                    currency = ""
+                    productType = "one_time"
+                    entitlement = ""
+                    mode = "test"
+                    inProducts = true
+                }
+                if (key == "slug" && !inProducts) slug = value
+                else if (key == "products" && !inProducts) inProducts = true
+                else if (inProducts && key == "id") productId = value
+                else if (inProducts && key == "name") productName = value
+                else if (inProducts && key == "description") description = value
+                else if (inProducts && key == "price") price = microPositiveInteger(value)
+                else if (inProducts && key == "currency") currency = value
+                else if (inProducts && key == "type") productType = value
+                else if (inProducts && key == "entitlement") entitlement = value
+                else if (inProducts && key == "mode") mode = value
+                else if (!(key == "products" && value == ""))
+                    error = "micro.yaml contains an unsupported key: $key"
+            }
+        }
+    }
+    if (error == "" && productId != "") {
+        var duplicate = false
+        var idIndex = 0
+        while (idIndex < ids.size) {
+            if (ids[idIndex] == productId) duplicate = true
+            idIndex = idIndex + 1
+        }
+        if (!microProductIdValid(productId) || productName == "" || price <= 0 ||
+            currency.size != 3 || (productType != "one_time" && productType != "subscription") ||
+            (mode != "test" && mode != "live") || duplicate) {
+            error = "micro.yaml contains an invalid or duplicate product."
+        } else {
+            apiProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false))
+            bundleProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true))
+        }
+    }
+    MicroProductDefinitions(error == "", slug, jsonArray(apiProducts), jsonArray(bundleProducts), error)
+}
+
 fun microPathSafe(value: string): bool {
     var valid = value != "" && value.size <= 512 && value[0] != 47 &&
         value[value.size - 1] != 47
@@ -206,6 +379,8 @@ fun microProjectBundle(root: Path): MicroResult {
     if (!publicFiles.succeeded) return MicroResult(false, publicFiles.message)
     val compiled = microCompileServer(root)
     if (!compiled.succeeded) return compiled
+    val definitions = microProductDefinitions(root)
+    if (!definitions.succeeded) return MicroResult(false, definitions.message)
     val serverPath = root.child(".micro/build/app.wasm")
     val hasServer = serverPath.info().isFile()
     var hasIndex = false
@@ -229,7 +404,7 @@ fun microProjectBundle(root: Path): MicroResult {
         [jsonString("micro.bundle.v1"), jsonString("micro.browser.v1"),
          microJsonFiles(microSourceFiles(root), false), server,
          microJsonFiles(publicFiles.files, true),
-         jsonObject(["products"], [jsonArray([])])]
+         jsonObject(["products"], [definitions.bundleProducts])]
     )
     val encoded = jsonStringify(bundle)
     val target = root.child(".micro/bundle.json")

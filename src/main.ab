@@ -2,7 +2,80 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+
+fun microProducts(api: MicroApi): MicroResult = microLinkedRequest(api, "/products")
+
+fun microSyncProducts(api: MicroApi, acceptPriceChanges: bool = false): MicroResult {
+    val project = microLocalProject()
+    if (!project.valid)
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    if (!path("micro.yaml").exists())
+        return MicroResult(false, "This project does not have micro.yaml.")
+    val definitions = microProductDefinitions(path("."))
+    if (!definitions.succeeded) return MicroResult(false, definitions.message)
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val syncHeaders: array<HttpHeader> = []
+    if (acceptPriceChanges)
+        syncHeaders.append(HttpHeader("X-Micro-Accept-Price-Changes", "true"))
+    val response = microRequest(
+        api,
+        "PUT",
+        "/api/v1/projects/${project.slug}/products",
+        jsonStringify(jsonObject(["products"], [definitions.apiProducts])),
+        "application/json",
+        credentials.accessToken,
+        1048576,
+        syncHeaders
+    )
+    if (response.succeeded)
+        MicroResult(true, response.response.body, response.response.body)
+    else MicroResult(false, response.message)
+}
+
+fun microFiles(api: MicroApi): MicroResult = microLinkedRequest(api, "/files")
+
+fun microUploadFile(
+    api: MicroApi,
+    stableId: string,
+    sourceName: string,
+    access: string = "private",
+    entitlement: string = ""
+): MicroResult {
+    val project = microLocalProject()
+    if (!project.valid)
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    if (!microProductIdValid(stableId)) return MicroResult(false, "Protected file ID is invalid.")
+    if (access == "entitlement" && !microProductIdValid(entitlement))
+        return MicroResult(false, "Entitlement ID is invalid.")
+    val source = path(sourceName)
+    val info = source.info()
+    if (!info.isFile() || info.size <= 0 || info.size > 33554432)
+        return MicroResult(false, "Protected file must be a regular file from 1 byte through 32 MiB.")
+    val contents = source.readText()
+    if (contents.size != info.size)
+        return MicroResult(false, "Protected file could not be read completely.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api,
+        "PUT",
+        "/api/v1/projects/${project.slug}/files/$stableId",
+        contents,
+        microMediaType(sourceName),
+        credentials.accessToken,
+        1048576,
+        [
+            HttpHeader("X-Micro-File-Name", source.name()),
+            HttpHeader("X-Micro-Access", access),
+            HttpHeader("X-Micro-Entitlement", entitlement)
+        ]
+    )
+    if (response.succeeded)
+        MicroResult(true, response.response.body, response.response.body)
+    else MicroResult(false, response.message)
+}
 
 fun microSignup(api: MicroApi, email: string, passwordFromInput: bool): MicroResult {
     val password = microReadSecret(if (passwordFromInput) "" else "Password: ", passwordFromInput)
@@ -244,6 +317,19 @@ fun microDeploySite(api: MicroApi, slug: string, preview: bool): MicroResult {
         ))
         if (!path(".micro/project.json").writeTextAtomic(state))
             return MicroResult(false, "The site deployed, but local project state could not be saved.\n$url\ndeployment $deploymentId")
+        if (path("micro.yaml").exists()) {
+            val synchronized = microSyncProducts(api)
+            if (!synchronized.succeeded)
+                return MicroResult(
+                    false,
+                    "The site deployed, but resource synchronization failed: ${synchronized.message}",
+                    jsonStringify(jsonObject(
+                        ["ok", "deployment", "resource_sync"],
+                        [jsonBoolean(false), parsed.value,
+                         jsonObject(["ok", "message"], [jsonBoolean(false), jsonString(synchronized.message)])]
+                    ))
+                )
+        }
         MicroResult(true, "$url\ndeployment $deploymentId · bundle $bundleDigest", deployed.response.body)
     }
 }
@@ -495,6 +581,28 @@ fun microRun(): MicroCommandResult {
         microProjectLogs(api, linuxArgument(index + 2))
     else if (command == "rollback" && index + 2 == count)
         microProjectRollback(api, linuxArgument(index + 1))
+    else if (command == "products" && index + 1 == count) microProducts(api)
+    else if (command == "products" && index + 2 == count &&
+        linuxArgument(index + 1) == "sync") microSyncProducts(api)
+    else if (command == "products" && index + 3 == count &&
+        linuxArgument(index + 1) == "sync" &&
+        linuxArgument(index + 2) == "--accept-price-changes")
+        microSyncProducts(api, true)
+    else if (command == "files" && index + 1 == count) microFiles(api)
+    else if (command == "files" && index + 4 == count &&
+        linuxArgument(index + 1) == "upload")
+        microUploadFile(api, linuxArgument(index + 2), linuxArgument(index + 3))
+    else if (command == "files" && index + 6 == count &&
+        linuxArgument(index + 1) == "upload" &&
+        linuxArgument(index + 4) == "--entitlement")
+        microUploadFile(
+            api, linuxArgument(index + 2), linuxArgument(index + 3),
+            "entitlement", linuxArgument(index + 5)
+        )
+    else if (command == "files" && index + 5 == count &&
+        linuxArgument(index + 1) == "upload" &&
+        linuxArgument(index + 4) == "--public")
+        microUploadFile(api, linuxArgument(index + 2), linuxArgument(index + 3), "public")
     else if (command == "open" && index + 1 == count) microOpenProject()
     else MicroResult(false, "Invalid command.\n${microUsage()}")
     MicroCommandResult(result, jsonOutput)
