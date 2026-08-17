@@ -216,7 +216,7 @@ fun microSlugValid(value: string): bool {
     val reserved = value == "api" || value == "auth" || value == "autoconfig" ||
         value == "autodiscover" || value == "cli" || value == "mail" ||
         value == "micro" || value == "runner" || value == "status" || value == "www"
-    valid && !reserved
+    valid && !reserved && !(value.size >= 2 && value.slice(0, 2) == "p-")
 }
 
 fun microQueryParameter(request: HttpRequest, name: string): string {

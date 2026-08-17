@@ -8,7 +8,7 @@ fun main: int {
     else if (!local.valid || local.secure || local.port != 8080) 2
     else if (microParseApi("http://micro.do").valid) 3
     else if (!microSlugValid("hello-world")) 4
-    else if (microSlugValid("api") || microSlugValid("Bad-Slug")) 5
+    else if (microSlugValid("api") || microSlugValid("p-private-preview") || microSlugValid("Bad-Slug")) 5
     else if (microBase64UrlEncode("hello") != "aGVsbG8") 6
     else if (!microPathSafe("assets/app.js") || microPathSafe("../secret") ||
         microPathSafe(".hidden")) 7
