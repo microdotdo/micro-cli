@@ -33,6 +33,55 @@ class MicroHttpResult(
     val message: string
 )
 
+fun microConstantTimeEqual(left: string, right: string): bool {
+    var difference = left.size ^ right.size
+    val maximum = if (left.size > right.size) left.size else right.size
+    var index = 0
+    while (index < maximum) {
+        val a = if (index < left.size) left[index] else 0
+        val b = if (index < right.size) right[index] else 0
+        difference = difference | (a ^ b)
+        index = index + 1
+    }
+    difference == 0
+}
+
+fun microLoadU32(buffer: NativeByteBuffer, offset: int): int =
+    buffer.load(offset) + buffer.load(offset + 1) * 256 +
+    buffer.load(offset + 2) * 65536 + buffer.load(offset + 3) * 16777216
+
+fun microStoreU32(var buffer: NativeByteBuffer, offset: int, value: int): void {
+    buffer.store(offset, value & 255)
+    buffer.store(offset + 1, (value >>> 8) & 255)
+    buffer.store(offset + 2, (value >>> 16) & 255)
+    buffer.store(offset + 3, (value >>> 24) & 255)
+    return
+}
+
+fun microReadSecret(prompt: string, standardInput: bool = false): string {
+    if (prompt != "") linuxWriteStandardErrorAll(prompt)
+    val terminal = nativeByteBuffer(64)
+    var echoDisabled = false
+    if (!standardInput) {
+        val read = linuxSyscall3(16, 0, 21505, nativePointerAddress(terminal.address))
+        if (read == 0) {
+            val flags = microLoadU32(terminal, 12)
+            microStoreU32(terminal, 12, flags & (~8))
+            echoDisabled = linuxSyscall3(
+                16, 0, 21506, nativePointerAddress(terminal.address)
+            ) == 0
+            microStoreU32(terminal, 12, flags)
+        }
+    }
+    val password = linuxStandardInput().readLine().text
+    if (echoDisabled) {
+        linuxSyscall3(16, 0, 21506, nativePointerAddress(terminal.address))
+        linuxWriteStandardErrorAll("\n")
+    }
+    terminal.close()
+    password
+}
+
 fun microBase64UrlEncode(value: string): string {
     val encoded = base64Encode(value)
     var result = ""

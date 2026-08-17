@@ -1,4 +1,5 @@
 import "../src/core.ab"
+import "../src/project.ab"
 
 fun main: int {
     val secure = microParseApi("https://micro.do/")
@@ -9,5 +10,11 @@ fun main: int {
     else if (!microSlugValid("hello-world")) 4
     else if (microSlugValid("api") || microSlugValid("Bad-Slug")) 5
     else if (microBase64UrlEncode("hello") != "aGVsbG8") 6
+    else if (!microPathSafe("assets/app.js") || microPathSafe("../secret") ||
+        microPathSafe(".hidden")) 7
+    else if (microMediaType("index.html") != "text/html; charset=utf-8" ||
+        microMediaType("photo.webp") != "image/webp") 8
+    else if (microDigest("hello") !=
+        "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") 9
     else 0
 }
