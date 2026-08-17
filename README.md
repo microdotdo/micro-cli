@@ -2,9 +2,20 @@
 
 `micro` builds, previews, deploys, and maintains full-stack WebAssembly sites on [micro.do](https://micro.do).
 
-## Install from source
+## Install
 
-Install the [Abla compiler](https://github.com/AndreBaltazar8/ablac), then:
+Linux x86-64 releases include a checksum alongside the executable:
+
+```sh
+curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/download/v0.4.0/micro-linux-x86_64
+curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/download/v0.4.0/micro-linux-x86_64.sha256
+sha256sum --check micro-linux-x86_64.sha256
+install -Dm755 micro-linux-x86_64 "$HOME/.local/bin/micro"
+micro login
+```
+
+To install from source instead, install the
+[Abla compiler](https://github.com/AndreBaltazar8/ablac), then:
 
 ```sh
 make install
@@ -42,6 +53,26 @@ deployments use the stored source revision and reject stale updates instead of
 silently overwriting another checkout. Optional `micro.yaml` products are
 synchronized non-destructively; protected files are uploaded explicitly with
 `micro files upload`.
+
+## GitHub Actions
+
+Authorize an exact repository, ref, environment, and target slug without
+creating a project or reserving the slug:
+
+```sh
+micro github link \
+  --repository owner/repository \
+  --environment production \
+  --ref refs/heads/main \
+  --slug my-site
+```
+
+Commit the generated `micro.github.json`. It contains a public binding ID and
+policy facts, never a credential; the Action uses it to select the exact
+owner-approved binding without accepting a target slug from workflow input.
+
+The first-party Action obtains a GitHub OIDC identity and invokes
+`micro deploy --github`. No long-lived Micro token is stored in GitHub.
 
 ## Development
 

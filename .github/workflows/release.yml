@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      ABLAC_COMMIT: 357c9591643feb89f68ba8cd0a3b0bcb23858a90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+      - name: Build public Abla compiler revision
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/AndreBaltazar8/ablac "$RUNNER_TEMP/ablac"
+          git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
+          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac'"
+      - name: Test and compile CLI
+        run: nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
+      - name: Link portable Linux executable
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends clang lld libssl-dev
+          clang -fuse-ld=lld build/micro.o -lssl -lcrypto -lpthread -o build/micro-linux-x86_64
+          strip build/micro-linux-x86_64
+          test "$(build/micro-linux-x86_64 --version)" = "micro ${GITHUB_REF_NAME#v}"
+          cd build
+          sha256sum micro-linux-x86_64 > micro-linux-x86_64.sha256
+      - name: Publish immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          build/micro-linux-x86_64
+          build/micro-linux-x86_64.sha256
+          --verify-tag
+          --title "micro ${GITHUB_REF_NAME#v}"
+          --generate-notes

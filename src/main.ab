@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -294,33 +294,55 @@ fun microFunctions(api: MicroApi): MicroResult {
     else MicroResult(false, response.message)
 }
 
-fun microDeploySite(api: MicroApi, slug: string, preview: bool): MicroResult {
+fun microDeploySite(
+    api: MicroApi,
+    slug: string,
+    preview: bool,
+    acceptPriceChanges: bool = false
+): MicroResult {
     if (!preview && !microSlugValid(slug))
         return MicroResult(false, "Slug must contain 3-63 lowercase letters, digits, or interior hyphens and must not be reserved.")
     val built = microBuildProject(path("."))
     if (!built.succeeded) return built
-    val bundle = path(".micro/bundle.json").readText()
-    if (bundle == "") return MicroResult(false, "Could not read .micro/bundle.json.")
     val credentials = microRefreshCredentials(api)
     if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
-    val deploymentHeaders: array<HttpHeader> = []
+    var baseRevision = ""
     if (!preview) {
         val linked = microLocalProject()
         if (linked.valid && linked.slug == slug) {
             val local = jsonParse(path(".micro/project.json").readText())
             if (local.succeeded && local.value.getString("source_sha256") != "")
-                deploymentHeaders.append(HttpHeader(
-                    "If-Match", local.value.getString("source_sha256")
-                ))
+                baseRevision = local.value.getString("source_sha256")
         }
     }
+    microUploadSite(
+        api, slug, preview, credentials.accessToken, baseRevision,
+        acceptPriceChanges
+    )
+}
+
+fun microUploadSite(
+    api: MicroApi,
+    slug: string,
+    preview: bool,
+    bearer: string,
+    baseRevision: string,
+    acceptPriceChanges: bool
+): MicroResult {
+    val bundle = path(".micro/bundle.json").readText()
+    if (bundle == "") return MicroResult(false, "Could not read .micro/bundle.json.")
+    val deploymentHeaders: array<HttpHeader> = []
+    if (!preview && baseRevision != "")
+        deploymentHeaders.append(HttpHeader("If-Match", baseRevision))
+    if (!preview && acceptPriceChanges)
+        deploymentHeaders.append(HttpHeader("X-Micro-Accept-Price-Changes", "true"))
     val deployed = microRequest(
         api,
         if (preview) "POST" else "PUT",
         if (preview) "/api/v1/previews" else "/api/v1/projects/$slug/deployments",
         bundle,
         "application/json",
-        credentials.accessToken,
+        bearer,
         1048576,
         deploymentHeaders
     )
@@ -346,21 +368,115 @@ fun microDeploySite(api: MicroApi, slug: string, preview: bool): MicroResult {
         ))
         if (!path(".micro/project.json").writeTextAtomic(state))
             return MicroResult(false, "The site deployed, but local project state could not be saved.\n$url\ndeployment $deploymentId")
-        if (path("micro.yaml").exists()) {
-            val synchronized = microSyncProducts(api)
-            if (!synchronized.succeeded)
-                return MicroResult(
-                    false,
-                    "The site deployed, but resource synchronization failed: ${synchronized.message}",
-                    jsonStringify(jsonObject(
-                        ["ok", "deployment", "resource_sync"],
-                        [jsonBoolean(false), parsed.value,
-                         jsonObject(["ok", "message"], [jsonBoolean(false), jsonString(synchronized.message)])]
-                    ))
-                )
-        }
         MicroResult(true, "$url\ndeployment $deploymentId · bundle $bundleDigest", deployed.response.body)
     }
+}
+
+class MicroGithubAuthorization(
+    val valid: bool,
+    val accessToken: string,
+    val slug: string,
+    val baseRevision: string,
+    val message: string
+)
+
+fun microGithubTokenValid(value: string): bool =
+    value.size >= 40 && value.size <= 256 && value.slice(0, 4) == "mda_"
+
+fun microGithubAuthorization(api: MicroApi): MicroGithubAuthorization {
+    val configured = linuxEnvironment("MICRO_GITHUB_OIDC_TOKEN")
+    if (!configured.found || configured.value.size < 100 || configured.value.size > 32768)
+        return MicroGithubAuthorization(false, "", "", "", "GitHub Actions OIDC token is unavailable.")
+    val binding = jsonParse(path("micro.github.json").readText())
+    if (!binding.succeeded || !binding.value.isObject() ||
+        binding.value.getString("binding_id").size != 36)
+        return MicroGithubAuthorization(false, "", "", "", "micro.github.json is missing or invalid; run `micro github link` and commit it.")
+    val exchanged = microRequest(
+        api, "POST", "/api/v1/actions/exchange",
+        jsonStringify(jsonObject(
+            ["binding_id", "oidc_token"],
+            [jsonString(binding.value.getString("binding_id")), jsonString(configured.value)]
+        )),
+        "application/json", "", 1048576
+    )
+    if (!exchanged.succeeded)
+        return MicroGithubAuthorization(false, "", "", "", exchanged.message)
+    val parsed = jsonParse(exchanged.response.body)
+    if (!parsed.succeeded || !parsed.value.isObject() ||
+        !microSlugValid(parsed.value.getString("slug")) ||
+        !microGithubTokenValid(parsed.value.getString("access_token")))
+        return MicroGithubAuthorization(false, "", "", "", "micro.do returned invalid GitHub deployment authorization.")
+    MicroGithubAuthorization(
+        true, parsed.value.getString("access_token"), parsed.value.getString("slug"),
+        parsed.value.getString("base_revision"), ""
+    )
+}
+
+fun microDeployGithub(api: MicroApi): MicroResult {
+    val built = microBuildProject(path("."))
+    if (!built.succeeded) return built
+    val authorization = microGithubAuthorization(api)
+    if (!authorization.valid) return MicroResult(false, authorization.message)
+    val priceChanges = linuxEnvironment("MICRO_ACCEPT_PRICE_CHANGES")
+    microUploadSite(
+        api, authorization.slug, false, authorization.accessToken,
+        authorization.baseRevision,
+        priceChanges.found && priceChanges.value == "true"
+    )
+}
+
+fun microGithubLink(
+    api: MicroApi,
+    repository: string,
+    environment: string,
+    gitRef: string,
+    slug: string
+): MicroResult {
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "POST", "/api/v1/github/bindings",
+        jsonStringify(jsonObject(
+            ["repository", "environment", "ref", "slug"],
+            [jsonString(repository), jsonString(environment), jsonString(gitRef), jsonString(slug)]
+        )), "application/json", credentials.accessToken
+    )
+    if (!response.succeeded) return MicroResult(false, response.message)
+    val parsed = jsonParse(response.response.body)
+    val bindingId = if (parsed.succeeded) parsed.value.getString("id") else ""
+    if (bindingId.size != 36)
+        return MicroResult(false, "micro.do returned an invalid GitHub binding.")
+    val state = jsonStringify(jsonObject(
+        ["binding_id", "repository", "environment", "ref", "slug"],
+        [jsonString(bindingId), jsonString(repository), jsonString(environment),
+         jsonString(gitRef), jsonString(slug)]
+    ))
+    if (!path("micro.github.json").writeTextAtomic(state))
+        return MicroResult(false, "GitHub was linked, but micro.github.json could not be written.", response.response.body)
+    MicroResult(true, response.response.body, response.response.body)
+}
+
+fun microGithubBindings(api: MicroApi): MicroResult {
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "GET", "/api/v1/github/bindings", "", "application/json",
+        credentials.accessToken
+    )
+    if (response.succeeded) MicroResult(true, response.response.body, response.response.body)
+    else MicroResult(false, response.message)
+}
+
+fun microGithubRevoke(api: MicroApi, binding: string): MicroResult {
+    if (binding.size != 36) return MicroResult(false, "GitHub binding ID is invalid.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "POST", "/api/v1/github/bindings/$binding/revoke", "{}",
+        "application/json", credentials.accessToken
+    )
+    if (response.succeeded) MicroResult(true, "Revoked GitHub deployment binding.")
+    else MicroResult(false, response.message)
 }
 
 fun microProjects(api: MicroApi): MicroResult {
@@ -569,7 +685,7 @@ fun microRun(): MicroCommandResult {
     if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
         return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
     if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.3.0"), jsonOutput)
+        return MicroCommandResult(MicroResult(true, "micro 0.4.0"), jsonOutput)
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
     val command = linuxArgument(index)
@@ -606,8 +722,14 @@ fun microRun(): MicroCommandResult {
     else if (command == "deploy" && index + 2 == count &&
         linuxArgument(index + 1) == "--preview")
         microDeploySite(api, "", true)
+    else if (command == "deploy" && index + 2 == count &&
+        linuxArgument(index + 1) == "--github")
+        microDeployGithub(api)
     else if (command == "deploy" && index + 2 == count)
         microDeploySite(api, linuxArgument(index + 1), false)
+    else if (command == "deploy" && index + 3 == count &&
+        linuxArgument(index + 2) == "--accept-price-changes")
+        microDeploySite(api, linuxArgument(index + 1), false, true)
     else if (command == "status" && index + 1 == count) microProjectStatus(api)
     else if (command == "deployments" && index + 1 == count) microProjectDeployments(api)
     else if (command == "logs" && index + 3 == count &&
@@ -637,6 +759,21 @@ fun microRun(): MicroCommandResult {
         linuxArgument(index + 1) == "upload" &&
         linuxArgument(index + 4) == "--public")
         microUploadFile(api, linuxArgument(index + 2), linuxArgument(index + 3), "public")
+    else if (command == "github" && index + 10 == count &&
+        linuxArgument(index + 1) == "link" &&
+        linuxArgument(index + 2) == "--repository" &&
+        linuxArgument(index + 4) == "--environment" &&
+        linuxArgument(index + 6) == "--ref" &&
+        linuxArgument(index + 8) == "--slug")
+        microGithubLink(
+            api, linuxArgument(index + 3), linuxArgument(index + 5),
+            linuxArgument(index + 7), linuxArgument(index + 9)
+        )
+    else if (command == "github" && index + 2 == count &&
+        linuxArgument(index + 1) == "bindings") microGithubBindings(api)
+    else if (command == "github" && index + 3 == count &&
+        linuxArgument(index + 1) == "revoke")
+        microGithubRevoke(api, linuxArgument(index + 2))
     else if (command == "open" && index + 1 == count) microOpenProject()
     else MicroResult(false, "Invalid command.\n${microUsage()}")
     MicroCommandResult(result, jsonOutput)

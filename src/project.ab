@@ -79,9 +79,9 @@ fun microConfiguredProduct(
     bundle: bool
 ): Json {
     if (bundle) jsonObject(
-        ["id", "name", "amount", "currency", "product_type", "entitlement"],
-        [jsonString(id), jsonString(name), jsonInteger(price), jsonString(currency),
-         jsonString(productType), jsonString(entitlement)]
+        ["id", "name", "description", "amount", "currency", "product_type", "entitlement", "mode"],
+        [jsonString(id), jsonString(name), jsonString(description), jsonInteger(price),
+         jsonString(currency), jsonString(productType), jsonString(entitlement), jsonString(mode)]
     ) else jsonObject(
         ["id", "name", "description", "price", "currency", "type", "entitlement", "mode"],
         [jsonString(id), jsonString(name), jsonString(description), jsonInteger(price),
@@ -134,7 +134,7 @@ fun microProductDefinitions(root: Path): MicroProductDefinitions {
                             if (ids[idIndex] == productId) duplicate = true
                             idIndex = idIndex + 1
                         }
-                        if (!microProductIdValid(productId) || productName == "" || price <= 0 ||
+                        if (!microProductIdValid(productId) || productName == "" || price <= 0 || price > 99999999 ||
                             currency.size != 3 || (productType != "one_time" && productType != "subscription") ||
                             (mode != "test" && mode != "live") || duplicate) {
                             error = "micro.yaml contains an invalid or duplicate product."
@@ -176,7 +176,7 @@ fun microProductDefinitions(root: Path): MicroProductDefinitions {
             if (ids[idIndex] == productId) duplicate = true
             idIndex = idIndex + 1
         }
-        if (!microProductIdValid(productId) || productName == "" || price <= 0 ||
+        if (!microProductIdValid(productId) || productName == "" || price <= 0 || price > 99999999 ||
             currency.size != 3 || (productType != "one_time" && productType != "subscription") ||
             (mode != "test" && mode != "live") || duplicate) {
             error = "micro.yaml contains an invalid or duplicate product."
