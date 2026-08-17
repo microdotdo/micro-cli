@@ -2,7 +2,36 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+
+fun microRunner(): string {
+    val configured = linuxEnvironment("MICRO_RUNNER")
+    if (configured.found && configured.value != "") configured.value else "micro-runner"
+}
+
+fun microDev(port: int = 8787): MicroResult {
+    if (port <= 0 || port > 65535)
+        return MicroResult(false, "Development port must be between 1 and 65535.")
+    val built = microBuildProject(path("."))
+    if (!built.succeeded) return built
+    val bundle = "${currentDirectory().text}/.micro/bundle.json"
+    val url = "http://127.0.0.1:$port"
+    linuxWriteStandardOutputAll("Micro development runner: $url\n")
+    val command = linuxCommand(microRunner())
+    command.argument("dev")
+    command.argument(bundle)
+    command.argument("--bind")
+    command.argument("127.0.0.1:$port")
+    val status = command.run()
+    if (status == 0 || status == 130) MicroResult(
+        true,
+        "Development runner stopped.",
+        jsonStringify(jsonObject(
+            ["ok", "url", "stopped"],
+            [jsonBoolean(true), jsonString(url), jsonBoolean(true)]
+        ))
+    ) else MicroResult(false, "The development runner exited with status $status.")
+}
 
 fun microProducts(api: MicroApi): MicroResult = microLinkedRequest(api, "/products")
 
@@ -552,6 +581,11 @@ fun microRun(): MicroCommandResult {
         microPullProject(api, linuxArgument(index + 1), linuxArgument(index + 2))
     else if (command == "build" && index + 1 == count)
         microBuildProject(path("."))
+    else if (command == "dev" && index + 1 == count)
+        microDev()
+    else if (command == "dev" && index + 3 == count &&
+        linuxArgument(index + 1) == "--port")
+        microDev(microParsePort(linuxArgument(index + 2), -1))
     else if (command == "signup" && index + 3 == count &&
         linuxArgument(index + 1) == "--email")
         microSignup(api, linuxArgument(index + 2), false)
