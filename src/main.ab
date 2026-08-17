@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -35,7 +35,11 @@ fun microDev(port: int = 8787): MicroResult {
 
 fun microProducts(api: MicroApi): MicroResult = microLinkedRequest(api, "/products")
 
-fun microSyncProducts(api: MicroApi, acceptPriceChanges: bool = false): MicroResult {
+fun microSyncProducts(
+    api: MicroApi,
+    acceptPriceChanges: bool = false,
+    acceptLiveProducts: bool = false
+): MicroResult {
     val project = microLocalProject()
     if (!project.valid)
         return MicroResult(false, "This directory is not linked to a deployed Micro.")
@@ -48,6 +52,8 @@ fun microSyncProducts(api: MicroApi, acceptPriceChanges: bool = false): MicroRes
     val syncHeaders: array<HttpHeader> = []
     if (acceptPriceChanges)
         syncHeaders.append(HttpHeader("X-Micro-Accept-Price-Changes", "true"))
+    if (acceptLiveProducts)
+        syncHeaders.append(HttpHeader("X-Micro-Accept-Live-Products", "true"))
     val response = microRequest(
         api,
         "PUT",
@@ -304,7 +310,8 @@ fun microDeploySite(
     api: MicroApi,
     slug: string,
     preview: bool,
-    acceptPriceChanges: bool = false
+    acceptPriceChanges: bool = false,
+    acceptLiveProducts: bool = false
 ): MicroResult {
     if (!preview && !microSlugValid(slug))
         return MicroResult(false, "Slug must contain 3-63 lowercase letters, digits, or interior hyphens and must not be reserved.")
@@ -323,7 +330,7 @@ fun microDeploySite(
     }
     microUploadSite(
         api, slug, preview, credentials.accessToken, baseRevision,
-        acceptPriceChanges
+        acceptPriceChanges, acceptLiveProducts
     )
 }
 
@@ -333,7 +340,8 @@ fun microUploadSite(
     preview: bool,
     bearer: string,
     baseRevision: string,
-    acceptPriceChanges: bool
+    acceptPriceChanges: bool,
+    acceptLiveProducts: bool
 ): MicroResult {
     val bundle = path(".micro/bundle.json").readText()
     if (bundle == "") return MicroResult(false, "Could not read .micro/bundle.json.")
@@ -342,6 +350,8 @@ fun microUploadSite(
         deploymentHeaders.append(HttpHeader("If-Match", baseRevision))
     if (!preview && acceptPriceChanges)
         deploymentHeaders.append(HttpHeader("X-Micro-Accept-Price-Changes", "true"))
+    if (!preview && acceptLiveProducts)
+        deploymentHeaders.append(HttpHeader("X-Micro-Accept-Live-Products", "true"))
     val deployed = microRequest(
         api,
         if (preview) "POST" else "PUT",
@@ -424,10 +434,12 @@ fun microDeployGithub(api: MicroApi): MicroResult {
     val authorization = microGithubAuthorization(api)
     if (!authorization.valid) return MicroResult(false, authorization.message)
     val priceChanges = linuxEnvironment("MICRO_ACCEPT_PRICE_CHANGES")
+    val liveProducts = linuxEnvironment("MICRO_ACCEPT_LIVE_PRODUCTS")
     microUploadSite(
         api, authorization.slug, false, authorization.accessToken,
         authorization.baseRevision,
-        priceChanges.found && priceChanges.value == "true"
+        priceChanges.found && priceChanges.value == "true",
+        liveProducts.found && liveProducts.value == "true"
     )
 }
 
@@ -736,6 +748,13 @@ fun microRun(): MicroCommandResult {
     else if (command == "deploy" && index + 3 == count &&
         linuxArgument(index + 2) == "--accept-price-changes")
         microDeploySite(api, linuxArgument(index + 1), false, true)
+    else if (command == "deploy" && index + 3 == count &&
+        linuxArgument(index + 2) == "--accept-live-products")
+        microDeploySite(api, linuxArgument(index + 1), false, false, true)
+    else if (command == "deploy" && index + 4 == count &&
+        linuxArgument(index + 2) == "--accept-price-changes" &&
+        linuxArgument(index + 3) == "--accept-live-products")
+        microDeploySite(api, linuxArgument(index + 1), false, true, true)
     else if (command == "status" && index + 1 == count) microProjectStatus(api)
     else if (command == "deployments" && index + 1 == count) microProjectDeployments(api)
     else if (command == "logs" && index + 3 == count &&
@@ -753,6 +772,15 @@ fun microRun(): MicroCommandResult {
         linuxArgument(index + 1) == "sync" &&
         linuxArgument(index + 2) == "--accept-price-changes")
         microSyncProducts(api, true)
+    else if (command == "products" && index + 3 == count &&
+        linuxArgument(index + 1) == "sync" &&
+        linuxArgument(index + 2) == "--accept-live-products")
+        microSyncProducts(api, false, true)
+    else if (command == "products" && index + 4 == count &&
+        linuxArgument(index + 1) == "sync" &&
+        linuxArgument(index + 2) == "--accept-price-changes" &&
+        linuxArgument(index + 3) == "--accept-live-products")
+        microSyncProducts(api, true, true)
     else if (command == "files" && index + 1 == count) microFiles(api)
     else if (command == "files" && index + 4 == count &&
         linuxArgument(index + 1) == "upload")
