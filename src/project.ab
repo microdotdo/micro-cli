@@ -235,7 +235,17 @@ fun microProjectBundle(root: Path): MicroResult {
     val target = root.child(".micro/bundle.json")
     if (!target.writeTextAtomic(encoded))
         MicroResult(false, "Could not write .micro/bundle.json.")
-    else MicroResult(true, "Built ${target.text}\nsha256 ${microDigest(encoded)}")
+    else {
+        val digest = microDigest(encoded)
+        MicroResult(
+            true,
+            "Built ${target.text}\nsha256 $digest",
+            jsonStringify(jsonObject(
+                ["ok", "bundle_path", "bundle_sha256"],
+                [jsonBoolean(true), jsonString(target.text), jsonString(digest)]
+            ))
+        )
+    }
 }
 
 fun microBuildProject(root: Path): MicroResult = microProjectBundle(root)
@@ -258,5 +268,11 @@ fun microNewProject(directory: string): MicroResult {
     val index = "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"utf-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\n  <title>My Micro</title>\n</head>\n<body>\n  <main>\n    <h1>My Micro</h1>\n    <p>Edit public/index.html, then run micro build.</p>\n  </main>\n</body>\n</html>\n"
     val created = root.child("public/index.html").writeTextAtomic(index)
     if (!created) MicroResult(false, "Could not create $directory.")
-    else MicroResult(true, "Created $directory\nRun: cd $directory && micro build")
+    else MicroResult(
+        true,
+        "Created $directory\nRun: cd $directory && micro build",
+        jsonStringify(jsonObject(
+            ["ok", "directory"], [jsonBoolean(true), jsonString(directory)]
+        ))
+    )
 }

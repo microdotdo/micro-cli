@@ -24,7 +24,8 @@ class MicroCredentials(
 
 class MicroResult(
     val succeeded: bool,
-    val message: string
+    val message: string,
+    val structured: string = ""
 )
 
 class MicroHttpResult(
@@ -188,7 +189,7 @@ fun microRequest(
     maximumResponseBytes: int = 1048576
 ): MicroHttpResult {
     val headers: array<HttpHeader> = [
-        HttpHeader("User-Agent", "micro-cli/0.1.0"),
+        HttpHeader("User-Agent", "micro-cli/0.3.0"),
         HttpHeader("Content-Type", contentType)
     ]
     if (bearer != "") headers.append(HttpHeader("Authorization", "Bearer $bearer"))
