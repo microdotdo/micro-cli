@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.3.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy <slug> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] open\n"
 
 fun microSignup(api: MicroApi, email: string, passwordFromInput: bool): MicroResult {
     val password = microReadSecret(if (passwordFromInput) "" else "Password: ", passwordFromInput)
@@ -201,6 +201,17 @@ fun microDeploySite(api: MicroApi, slug: string, preview: bool): MicroResult {
     if (bundle == "") return MicroResult(false, "Could not read .micro/bundle.json.")
     val credentials = microRefreshCredentials(api)
     if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val deploymentHeaders: array<HttpHeader> = []
+    if (!preview) {
+        val linked = microLocalProject()
+        if (linked.valid && linked.slug == slug) {
+            val local = jsonParse(path(".micro/project.json").readText())
+            if (local.succeeded && local.value.getString("source_sha256") != "")
+                deploymentHeaders.append(HttpHeader(
+                    "If-Match", local.value.getString("source_sha256")
+                ))
+        }
+    }
     val deployed = microRequest(
         api,
         if (preview) "POST" else "PUT",
@@ -208,7 +219,8 @@ fun microDeploySite(api: MicroApi, slug: string, preview: bool): MicroResult {
         bundle,
         "application/json",
         credentials.accessToken,
-        1048576
+        1048576,
+        deploymentHeaders
     )
     if (!deployed.succeeded) return MicroResult(false, deployed.message)
     val parsed = jsonParse(deployed.response.body)
@@ -253,6 +265,79 @@ class MicroLocalProject(
     val slug: string,
     val deploymentId: string
 )
+
+fun microRestoreBundleFiles(root: Path, files: Json, publicFiles: bool): string {
+    if (!files.isArray()) return "The source snapshot has an invalid file list."
+    var index = 0
+    var error = ""
+    while (index < files.size() && error == "") {
+        val file = files.at(index)
+        val relative = file.getString("path")
+        val encoded = file.getString("body_base64")
+        val expected = file.getString("sha256")
+        if (!file.isObject() || !microPathSafe(relative) || expected.size != 64) {
+            error = "The source snapshot contains an unsafe file path."
+        } else {
+            val contents = base64Decode(encoded)
+            if (microDigest(contents) != expected) {
+                error = "The source snapshot failed its checksum: $relative"
+            } else {
+                val target = if (publicFiles) root.child("public").child(relative)
+                    else root.child(relative)
+                if (!target.createParentDirectories() || !target.writeTextAtomic(contents))
+                    error = "Could not restore $relative."
+            }
+        }
+        index = index + 1
+    }
+    error
+}
+
+fun microPullProject(api: MicroApi, slug: string, directory: string): MicroResult {
+    if (!microSlugValid(slug))
+        return MicroResult(false, "Slug must contain 3-63 lowercase letters, digits, or interior hyphens and must not be reserved.")
+    if (directory == "" || directory == "/" || directory == "." || directory == "..")
+        return MicroResult(false, "Choose a dedicated pull directory.")
+    val root = path(directory)
+    if (root.exists() && (!root.info().isDirectory() || root.entries().size > 0))
+        return MicroResult(false, "$directory already exists and is not empty.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "GET", "/api/v1/projects/$slug/source", "", "application/json",
+        credentials.accessToken, 67108864
+    )
+    if (!response.succeeded) return MicroResult(false, response.message)
+    val parsed = jsonParse(response.response.body)
+    if (!parsed.succeeded || !parsed.value.isObject())
+        return MicroResult(false, "micro.do returned an invalid source snapshot.")
+    val bundle = parsed.value.get("bundle")
+    if (!bundle.isObject()) return MicroResult(false, "micro.do omitted the source bundle.")
+    if (!root.createDirectories()) return MicroResult(false, "Could not create $directory.")
+    var error = microRestoreBundleFiles(root, bundle.get("source"), false)
+    if (error == "") error = microRestoreBundleFiles(root, bundle.get("assets"), true)
+    if (error != "") return MicroResult(false, error)
+    val state = jsonStringify(jsonObject(
+        ["project_id", "slug", "deployment_id", "bundle_sha256", "source_sha256"],
+        [jsonString(parsed.value.getString("project_id")), jsonString(slug),
+         jsonString(parsed.value.getString("deployment_id")),
+         jsonString(parsed.value.getString("bundle_sha256")),
+         jsonString(parsed.value.getString("source_sha256"))]
+    ))
+    if (!root.child(".micro/project.json").writeTextAtomic(state))
+        return MicroResult(false, "Source was restored, but local project state could not be saved.")
+    MicroResult(
+        true,
+        "Pulled $slug into $directory",
+        jsonStringify(jsonObject(
+            ["ok", "slug", "directory", "project_id", "deployment_id", "source_sha256"],
+            [jsonBoolean(true), jsonString(slug), jsonString(directory),
+             jsonString(parsed.value.getString("project_id")),
+             jsonString(parsed.value.getString("deployment_id")),
+             jsonString(parsed.value.getString("source_sha256"))]
+        ))
+    )
+}
 
 fun microLocalProject(): MicroLocalProject {
     val parsed = jsonParse(path(".micro/project.json").readText())
@@ -375,6 +460,10 @@ fun microRun(): MicroCommandResult {
     val command = linuxArgument(index)
     val result = if (command == "new" && index + 2 == count)
         microNewProject(linuxArgument(index + 1))
+    else if (command == "pull" && index + 2 == count)
+        microPullProject(api, linuxArgument(index + 1), linuxArgument(index + 1))
+    else if (command == "pull" && index + 3 == count)
+        microPullProject(api, linuxArgument(index + 1), linuxArgument(index + 2))
     else if (command == "build" && index + 1 == count)
         microBuildProject(path("."))
     else if (command == "signup" && index + 3 == count &&

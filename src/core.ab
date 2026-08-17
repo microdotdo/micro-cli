@@ -186,13 +186,19 @@ fun microRequest(
     body: string = "",
     contentType: string = "application/json",
     bearer: string = "",
-    maximumResponseBytes: int = 1048576
+    maximumResponseBytes: int = 1048576,
+    extraHeaders: array<HttpHeader> = []
 ): MicroHttpResult {
     val headers: array<HttpHeader> = [
         HttpHeader("User-Agent", "micro-cli/0.3.0"),
         HttpHeader("Content-Type", contentType)
     ]
     if (bearer != "") headers.append(HttpHeader("Authorization", "Bearer $bearer"))
+    var index = 0
+    while (index < extraHeaders.size) {
+        headers.append(extraHeaders[index])
+        index = index + 1
+    }
     microChecked(api.client(maximumResponseBytes).send(
         httpRequest(method, endpoint, body, headers)
     ))
