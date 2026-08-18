@@ -54,5 +54,11 @@ fun main: int {
     else if (microSha256Valid(
         "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef"
     ) || microSha256Valid("0123")) 22
+    else if (!microScheduleIntervalValid(5) || !microScheduleIntervalValid(10080) ||
+        microScheduleIntervalValid(4) || microScheduleIntervalValid(10081)) 23
+    else if (!microSchedulePayloadValid("{\"kind\":\"digest\"}") ||
+        microSchedulePayloadValid("[]") || microSchedulePayloadValid("not-json")) 24
+    else if (!microScheduleIdValid("daily.digest_2") ||
+        microScheduleIdValid("Daily") || microScheduleIdValid("-daily")) 25
     else 0
 }

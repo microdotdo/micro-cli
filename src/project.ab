@@ -67,6 +67,27 @@ fun microProductIdValid(value: string): bool {
     valid
 }
 
+fun microScheduleIntervalValid(value: int): bool = value >= 5 && value <= 10080
+
+fun microScheduleIdValid(value: string): bool {
+    if (value.size < 1 || value.size > 64) return false
+    var valid = (value[0] >= 97 && value[0] <= 122) ||
+        (value[0] >= 48 && value[0] <= 57)
+    var index = 1
+    while (valid && index < value.size) {
+        val byte = value[index]
+        valid = (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) ||
+            byte == 46 || byte == 95 || byte == 45
+        index = index + 1
+    }
+    valid
+}
+
+fun microSchedulePayloadValid(value: string): bool {
+    val parsed = jsonParse(value)
+    parsed.succeeded && parsed.value.isObject() && jsonStringify(parsed.value).size <= 8192
+}
+
 fun microConfiguredProduct(
     id: string,
     name: string,

@@ -49,6 +49,9 @@ micro settings visibility private --confirm
 micro invitations create teammate@example.com developer --can-promote
 micro domains add app.example.com
 micro private-grants create --expires-days 30 --label client-preview
+micro schedules set daily-digest --every-minutes 1440
+micro schedules set cleanup --every-minutes 60 --payload-file schedule.json
+micro schedules run daily-digest --confirm
 micro usage
 micro spending-cap set --monthly-cents 1000 --warning-percent 80
 micro logs --since 30m
@@ -88,6 +91,13 @@ expire after seven days. Accept a token through standard input with
 the process list. Custom domains must complete the returned DNS proof before
 they route. Private access tokens are shown only by the create response and can
 be revoked without redeploying the site.
+
+Schedules enqueue authenticated `schedule.triggered` events for the active
+production Wasm deployment. The control plane prevents overlapping automatic
+deliveries for the same schedule and skips stale backlog instead of flooding a
+project after downtime. Payload files must contain a JSON object up to 8 KiB;
+they are ordinary configuration and must never contain credentials or bearer
+tokens. Manual runs and removals require `--confirm`.
 
 `micro usage` reports account and daily totals. A hard spending cap is the
 default; add `--soft` only for a warning-only threshold. `micro plans` is public,
