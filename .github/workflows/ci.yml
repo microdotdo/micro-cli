@@ -21,4 +21,7 @@ jobs:
           git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
           nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac'"
       - name: Test and build CLI
-        run: nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
+        run: >-
+          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run
+          "'$RUNNER_TEMP/ablac/build/ablac' package update --project . &&
+          make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"

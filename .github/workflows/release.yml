@@ -12,7 +12,7 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     env:
-      ABLAC_COMMIT: 357c9591643feb89f68ba8cd0a3b0bcb23858a90
+      ABLAC_COMMIT: 946d112a649c4f4fc6f4e156251c10c2d2095985
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
@@ -22,7 +22,10 @@ jobs:
           git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
           nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac'"
       - name: Test and compile CLI
-        run: nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
+        run: >-
+          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run
+          "'$RUNNER_TEMP/ablac/build/ablac' package update --project . &&
+          make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
       - name: Link portable Linux executable
         run: |
           sudo apt-get update
