@@ -311,6 +311,7 @@ fun microMediaType(value: string): string {
     else if (extension == "jpg" || extension == "jpeg") "image/jpeg"
     else if (extension == "gif") "image/gif"
     else if (extension == "webp") "image/webp"
+    else if (extension == "avif") "image/avif"
     else if (extension == "ico") "image/x-icon"
     else if (extension == "woff") "font/woff"
     else if (extension == "woff2") "font/woff2"

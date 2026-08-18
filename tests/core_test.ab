@@ -14,7 +14,8 @@ fun main: int {
     else if (!microPathSafe("assets/app.js") || microPathSafe("../secret") ||
         microPathSafe(".hidden")) 7
     else if (microMediaType("index.html") != "text/html; charset=utf-8" ||
-        microMediaType("photo.webp") != "image/webp") 8
+        microMediaType("photo.webp") != "image/webp" ||
+        microMediaType("photo.avif") != "image/avif") 8
     else if (microDigest("hello") !=
         "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824") 9
     else if (!microUuidValid("11111111-1111-4111-8111-111111111111")) 10
