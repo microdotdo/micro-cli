@@ -53,6 +53,7 @@ micro schedules set daily-digest --every-minutes 1440
 micro schedules set cleanup --every-minutes 60 --payload-file schedule.json
 micro schedules run daily-digest --confirm
 micro emails
+micro platform status
 micro usage
 micro spending-cap set --monthly-cents 1000 --warning-percent 80
 micro logs --since 30m

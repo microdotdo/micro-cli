@@ -1,4 +1,4 @@
 name = "micro-cli"
-version = "0.7.1"
+version = "0.7.2"
 entry = "src/main.ab"
 compileCapabilities = ["filesystem.write"]
