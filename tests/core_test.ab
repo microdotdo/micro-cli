@@ -60,5 +60,31 @@ fun main: int {
         microSchedulePayloadValid("[]") || microSchedulePayloadValid("not-json")) 24
     else if (!microScheduleIdValid("daily.digest_2") ||
         microScheduleIdValid("Daily") || microScheduleIdValid("-daily")) 25
-    else 0
+    else if (!microStringLess("app.ab", "micro.yaml") ||
+        microStringLess("styles.css", "index.html") ||
+        microStringLess("same", "same")) 26
+    else {
+        val unordered: array<MicroProjectFile> = [
+            MicroProjectFile("styles.css", "body{}", "text/css"),
+            MicroProjectFile("app.js", "run()", "text/javascript"),
+            MicroProjectFile("index.html", "hello", "text/html")
+        ]
+        val ordered = microOrderedProjectFiles(unordered)
+        if (ordered[0].path != "app.js" || ordered[1].path != "index.html" ||
+            ordered[2].path != "styles.css") return 27
+        val canonical = jsonStringify(jsonObject(
+            ["version", "sdk_version", "source", "server", "assets", "resources"],
+            [jsonString("micro.bundle.v1"), jsonString("micro.browser.v1"),
+             jsonArray([]), jsonNull(),
+             jsonArray([jsonObject(
+                ["path", "media_type", "sha256", "body_base64"],
+                [jsonString("index.html"), jsonString("text/html; charset=utf-8"),
+                 jsonString("2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"),
+                 jsonString("aGVsbG8=")]
+             )]), jsonObject(["products"], [jsonArray([])])]
+        ))
+        if (microDigest(canonical) !=
+            "bd3cd6d66b7f007a66dc1f4629c7565459706134978c0d2e98991ad608b7fbfa") return 28
+        0
+    }
 }

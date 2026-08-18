@@ -67,6 +67,35 @@ fun microProductIdValid(value: string): bool {
     valid
 }
 
+fun microStringLess(left: string, right: string): bool {
+    var index = 0
+    var decided = false
+    var less = false
+    while (!decided && index < left.size && index < right.size) {
+        if (left[index] < right[index]) {
+            less = true
+            decided = true
+        } else if (left[index] > right[index]) decided = true
+        index = index + 1
+    }
+    if (!decided) less = left.size < right.size
+    less
+}
+
+fun microAppendJsonSorted(var values: array<Json>, value: Json, key: string): void {
+    values.append(value)
+    var index = values.size - 1
+    while (index > 0 && microStringLess(
+        values[index].getString(key), values[index - 1].getString(key)
+    )) {
+        val previous = values[index - 1]
+        values[index - 1] = values[index]
+        values[index] = previous
+        index = index - 1
+    }
+    return
+}
+
 fun microScheduleIntervalValid(value: int): bool = value >= 5 && value <= 10080
 
 fun microScheduleIdValid(value: string): bool {
@@ -161,8 +190,8 @@ fun microProductDefinitions(root: Path): MicroProductDefinitions {
                             error = "micro.yaml contains an invalid or duplicate product."
                         } else {
                             ids.append(productId)
-                            apiProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false))
-                            bundleProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true))
+                            microAppendJsonSorted(apiProducts, microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false), "id")
+                            microAppendJsonSorted(bundleProducts, microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true), "id")
                         }
                     }
                     productId = ""
@@ -202,8 +231,8 @@ fun microProductDefinitions(root: Path): MicroProductDefinitions {
             (mode != "test" && mode != "live") || duplicate) {
             error = "micro.yaml contains an invalid or duplicate product."
         } else {
-            apiProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false))
-            bundleProducts.append(microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true))
+            microAppendJsonSorted(apiProducts, microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, false), "id")
+            microAppendJsonSorted(bundleProducts, microConfiguredProduct(productId, productName, description, price, currency, productType, entitlement, mode, true), "id")
         }
     }
     MicroProductDefinitions(error == "", slug, jsonArray(apiProducts), jsonArray(bundleProducts), error)
@@ -352,11 +381,31 @@ fun microSourceFiles(root: Path): array<MicroProjectFile> {
     files
 }
 
+fun microOrderedProjectFiles(files: array<MicroProjectFile>): array<MicroProjectFile> {
+    val ordered: array<MicroProjectFile> = []
+    var source = 0
+    while (source < files.size) {
+        ordered.append(files[source])
+        var target = ordered.size - 1
+        while (target > 0 && microStringLess(
+            ordered[target].path, ordered[target - 1].path
+        )) {
+            val previous = ordered[target - 1]
+            ordered[target - 1] = ordered[target]
+            ordered[target] = previous
+            target = target - 1
+        }
+        source = source + 1
+    }
+    ordered
+}
+
 fun microJsonFiles(files: array<MicroProjectFile>, assets: bool): Json {
+    val ordered = microOrderedProjectFiles(files)
     val encoded: array<Json> = []
     var index = 0
-    while (index < files.size) {
-        encoded.append(if (assets) microBundleAsset(files[index]) else microBundleFile(files[index]))
+    while (index < ordered.size) {
+        encoded.append(if (assets) microBundleAsset(ordered[index]) else microBundleFile(ordered[index]))
         index = index + 1
     }
     jsonArray(encoded)
