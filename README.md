@@ -7,8 +7,8 @@
 Linux x86-64 releases include a checksum alongside the executable:
 
 ```sh
-curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/download/v0.4.0/micro-linux-x86_64
-curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/download/v0.4.0/micro-linux-x86_64.sha256
+curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/latest/download/micro-linux-x86_64
+curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/latest/download/micro-linux-x86_64.sha256
 sha256sum --check micro-linux-x86_64.sha256
 install -Dm755 micro-linux-x86_64 "$HOME/.local/bin/micro"
 micro login
@@ -44,6 +44,13 @@ repositories together.
 micro signup --email you@example.com
 micro deploy my-site
 micro status
+micro settings
+micro settings visibility private --confirm
+micro invitations create teammate@example.com developer --can-promote
+micro domains add app.example.com
+micro private-grants create --expires-days 30 --label client-preview
+micro usage
+micro spending-cap set --monthly-cents 1000 --warning-percent 80
 micro logs --since 30m
 micro users
 micro users disable 11111111-1111-4111-8111-111111111111 --confirm
@@ -73,6 +80,19 @@ synchronized non-destructively; protected files are uploaded explicitly with
 and entitlements while immediately revoking active sessions, recovery links,
 verification links, and private download grants. Session revocation can be used
 separately without disabling the user.
+
+Project roles are `viewer`, `developer`, and `admin`; production activation is
+an independent `--can-promote` grant. Email invitations are single-use and
+expire after seven days. Accept a token through standard input with
+`micro invitations accept --token-stdin` so it does not enter shell history or
+the process list. Custom domains must complete the returned DNS proof before
+they route. Private access tokens are shown only by the create response and can
+be revoked without redeploying the site.
+
+`micro usage` reports account and daily totals. A hard spending cap is the
+default; add `--soft` only for a warning-only threshold. `micro plans` is public,
+while `micro billing`, `micro billing checkout PLAN`, and `micro billing portal`
+use the authenticated owner account when paid plans are enabled.
 Retention defaults to keeping project records forever. A finite 30–3650 day
 policy can be manual or automatic, but it never prunes purchases or
 entitlements. Manual pruning requires the current preview count and

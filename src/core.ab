@@ -273,7 +273,7 @@ fun microRequest(
     extraHeaders: array<HttpHeader> = []
 ): MicroHttpResult {
     val headers: array<HttpHeader> = [
-        HttpHeader("User-Agent", "micro-cli/0.5.0"),
+        HttpHeader("User-Agent", "micro-cli/0.6.0"),
         HttpHeader("Content-Type", contentType)
     ]
     if (bearer != "") headers.append(HttpHeader("Authorization", "Bearer $bearer"))
@@ -297,7 +297,7 @@ fun microSlugValid(value: string): bool {
         index = index + 1
     }
     val reserved = value == "api" || value == "auth" || value == "autoconfig" ||
-        value == "autodiscover" || value == "cli" || value == "mail" ||
+        value == "autodiscover" || value == "cli" || value == "custom" || value == "mail" ||
         value == "micro" || value == "runner" || value == "status" || value == "www"
     valid && !reserved && !(value.size >= 2 && value.slice(0, 2) == "p-")
 }

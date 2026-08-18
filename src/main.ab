@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.5.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] project deletions [--json]\n  micro [--api URL] project delete --confirm-slug SLUG --confirm [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] backups [--json]\n  micro [--api URL] backups create --confirm [--json]\n  micro [--api URL] backups restore <backup-id> --backup-sha256 SHA --expected-current-sha256 SHA --confirm [--json]\n  micro [--api URL] backups delete <backup-id> --sha256 SHA --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.6.0\n\nBuild, deploy, and operate small full-stack sites on micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] plans [--json]\n  micro [--api URL] usage [--json]\n  micro [--api URL] spending-cap set --monthly-cents CENTS --warning-percent PERCENT [--soft] [--json]\n  micro [--api URL] spending-cap delete --confirm [--json]\n  micro [--api URL] billing [--json]\n  micro [--api URL] billing checkout <plan> [--json]\n  micro [--api URL] billing portal [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] project deletions [--json]\n  micro [--api URL] project delete --confirm-slug SLUG --confirm [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] settings [--json]\n  micro [--api URL] settings visibility <public|private> --confirm [--json]\n  micro [--api URL] members [--json]\n  micro [--api URL] members set <email> <viewer|developer|admin> [--can-promote] [--json]\n  micro [--api URL] members remove <account-id> --confirm [--json]\n  micro [--api URL] invitations [--json]\n  micro [--api URL] invitations create <email> <viewer|developer|admin> [--can-promote] [--json]\n  micro [--api URL] invitations revoke <invitation-id> --confirm [--json]\n  micro [--api URL] invitations accept --token-stdin [--json]\n  micro [--api URL] domains [--json]\n  micro [--api URL] domains add <hostname> [--json]\n  micro [--api URL] domains verify <domain-id> [--json]\n  micro [--api URL] domains remove <domain-id> --confirm [--json]\n  micro [--api URL] private-grants [--json]\n  micro [--api URL] private-grants create --expires-days DAYS --label LABEL [--json]\n  micro [--api URL] private-grants revoke <grant-id> --confirm [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] backups [--json]\n  micro [--api URL] backups create --confirm [--json]\n  micro [--api URL] backups restore <backup-id> --backup-sha256 SHA --expected-current-sha256 SHA --confirm [--json]\n  micro [--api URL] backups delete <backup-id> --sha256 SHA --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -946,6 +946,231 @@ fun microLinkedRequest(
     else MicroResult(false, response.message)
 }
 
+fun microAuthenticatedRequest(
+    api: MicroApi,
+    method: string,
+    endpoint: string,
+    body: string = "",
+    successMessage: string = ""
+): MicroResult {
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, method, endpoint, body, "application/json", credentials.accessToken
+    )
+    if (!response.succeeded) return MicroResult(false, response.message)
+    val message = if (response.response.body != "") response.response.body else successMessage
+    MicroResult(true, message, response.response.body)
+}
+
+fun microLinkedOperation(
+    api: MicroApi,
+    method: string,
+    endpoint: string,
+    body: string = "",
+    successMessage: string = ""
+): MicroResult {
+    val project = microLocalProject()
+    if (!project.valid)
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    microAuthenticatedRequest(
+        api, method, "/api/v1/projects/${project.slug}$endpoint", body, successMessage
+    )
+}
+
+fun microProjectRoleValid(role: string): bool =
+    role == "viewer" || role == "developer" || role == "admin"
+
+fun microPlans(api: MicroApi): MicroResult {
+    val response = microRequest(api, "GET", "/api/v1/plans")
+    if (response.succeeded)
+        MicroResult(true, response.response.body, response.response.body)
+    else MicroResult(false, response.message)
+}
+
+fun microUsageStatus(api: MicroApi): MicroResult =
+    microAuthenticatedRequest(api, "GET", "/api/v1/usage")
+
+fun microSetSpendingCap(
+    api: MicroApi,
+    monthlyCents: int,
+    warningPercent: int,
+    hardStop: bool
+): MicroResult {
+    if (monthlyCents < 0 || monthlyCents > 1000000 ||
+        warningPercent < 1 || warningPercent > 100)
+        return MicroResult(false, "Monthly cents must be 0 through 1000000 and warning percent 1 through 100.")
+    microAuthenticatedRequest(
+        api, "PUT", "/api/v1/spending-cap",
+        jsonStringify(jsonObject(
+            ["monthly_usage_cap_cents", "warning_percent", "hard_stop"],
+            [jsonInteger(monthlyCents), jsonInteger(warningPercent), jsonBoolean(hardStop)]
+        ))
+    )
+}
+
+fun microDeleteSpendingCap(api: MicroApi, confirmed: bool): MicroResult {
+    if (!confirmed) return MicroResult(false, "Removing the spending cap requires --confirm.")
+    microAuthenticatedRequest(
+        api, "DELETE", "/api/v1/spending-cap", "", "Removed the account spending cap."
+    )
+}
+
+fun microBillingStatus(api: MicroApi): MicroResult =
+    microAuthenticatedRequest(api, "GET", "/api/v1/billing")
+
+fun microBillingCheckout(api: MicroApi, planId: string): MicroResult {
+    if (!microProductIdValid(planId)) return MicroResult(false, "Plan ID is invalid.")
+    microAuthenticatedRequest(
+        api, "POST", "/api/v1/billing/checkout",
+        jsonStringify(jsonObject(["plan_id"], [jsonString(planId)]))
+    )
+}
+
+fun microBillingPortal(api: MicroApi): MicroResult =
+    microAuthenticatedRequest(api, "POST", "/api/v1/billing/portal", "{}")
+
+fun microProjectSettings(api: MicroApi): MicroResult =
+    microLinkedOperation(api, "GET", "/settings")
+
+fun microSetProjectVisibility(
+    api: MicroApi,
+    visibility: string,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed) return MicroResult(false, "Changing project visibility requires --confirm.")
+    if (visibility != "public" && visibility != "private")
+        return MicroResult(false, "Visibility must be public or private.")
+    microLinkedOperation(
+        api, "PUT", "/settings",
+        jsonStringify(jsonObject(["visibility"], [jsonString(visibility)]))
+    )
+}
+
+fun microProjectMembers(api: MicroApi): MicroResult =
+    microLinkedOperation(api, "GET", "/members")
+
+fun microSetProjectMember(
+    api: MicroApi,
+    email: string,
+    role: string,
+    canPromote: bool
+): MicroResult {
+    if (!microProjectRoleValid(role) || (role == "viewer" && canPromote))
+        return MicroResult(false, "Role must be viewer, developer, or admin; viewers cannot promote.")
+    microLinkedOperation(
+        api, "PUT", "/members",
+        jsonStringify(jsonObject(
+            ["email", "role", "can_promote"],
+            [jsonString(email), jsonString(role), jsonBoolean(canPromote)]
+        ))
+    )
+}
+
+fun microRemoveProjectMember(api: MicroApi, accountId: string, confirmed: bool): MicroResult {
+    if (!confirmed) return MicroResult(false, "Removing a project member requires --confirm.")
+    if (!microUuidValid(accountId)) return MicroResult(false, "Project member ID must be a UUID.")
+    microLinkedOperation(
+        api, "DELETE", "/members/$accountId", "", "Removed the project member."
+    )
+}
+
+fun microProjectInvitations(api: MicroApi): MicroResult =
+    microLinkedOperation(api, "GET", "/invitations")
+
+fun microCreateProjectInvitation(
+    api: MicroApi,
+    email: string,
+    role: string,
+    canPromote: bool
+): MicroResult {
+    if (!microProjectRoleValid(role) || (role == "viewer" && canPromote))
+        return MicroResult(false, "Role must be viewer, developer, or admin; viewers cannot promote.")
+    microLinkedOperation(
+        api, "POST", "/invitations",
+        jsonStringify(jsonObject(
+            ["email", "role", "can_promote"],
+            [jsonString(email), jsonString(role), jsonBoolean(canPromote)]
+        ))
+    )
+}
+
+fun microRevokeProjectInvitation(
+    api: MicroApi,
+    invitationId: string,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed) return MicroResult(false, "Revoking a project invitation requires --confirm.")
+    if (!microUuidValid(invitationId)) return MicroResult(false, "Invitation ID must be a UUID.")
+    microLinkedOperation(
+        api, "DELETE", "/invitations/$invitationId", "", "Revoked the project invitation."
+    )
+}
+
+fun microAcceptProjectInvitation(api: MicroApi, tokenFromStdin: bool): MicroResult {
+    if (!tokenFromStdin)
+        return MicroResult(false, "Invitation tokens must be supplied with --token-stdin.")
+    val token = microReadSecret("", true)
+    if (token.size < 32 || token.size > 256)
+        return MicroResult(false, "The invitation token is invalid.")
+    microAuthenticatedRequest(
+        api, "POST", "/api/v1/invitations/accept",
+        jsonStringify(jsonObject(["token"], [jsonString(token)]))
+    )
+}
+
+fun microProjectDomains(api: MicroApi): MicroResult =
+    microLinkedOperation(api, "GET", "/domains")
+
+fun microAddProjectDomain(api: MicroApi, hostname: string): MicroResult =
+    microLinkedOperation(
+        api, "POST", "/domains",
+        jsonStringify(jsonObject(["hostname"], [jsonString(hostname)]))
+    )
+
+fun microVerifyProjectDomain(api: MicroApi, domainId: string): MicroResult {
+    if (!microUuidValid(domainId)) return MicroResult(false, "Domain ID must be a UUID.")
+    microLinkedOperation(api, "POST", "/domains/$domainId/verify", "{}")
+}
+
+fun microRemoveProjectDomain(api: MicroApi, domainId: string, confirmed: bool): MicroResult {
+    if (!confirmed) return MicroResult(false, "Removing a custom domain requires --confirm.")
+    if (!microUuidValid(domainId)) return MicroResult(false, "Domain ID must be a UUID.")
+    microLinkedOperation(
+        api, "DELETE", "/domains/$domainId", "", "Removed the custom domain."
+    )
+}
+
+fun microProjectPrivateGrants(api: MicroApi): MicroResult =
+    microLinkedOperation(api, "GET", "/private-grants")
+
+fun microCreateProjectPrivateGrant(
+    api: MicroApi,
+    expiresDays: int,
+    label: string
+): MicroResult {
+    if (expiresDays < 1 || expiresDays > 365 || label.size > 120)
+        return MicroResult(false, "Private grants must expire in 1 through 365 days and labels may use 120 bytes.")
+    microLinkedOperation(
+        api, "POST", "/private-grants",
+        jsonStringify(jsonObject(
+            ["expires_in_days", "label"], [jsonInteger(expiresDays), jsonString(label)]
+        ))
+    )
+}
+
+fun microRevokeProjectPrivateGrant(
+    api: MicroApi,
+    grantId: string,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed) return MicroResult(false, "Revoking a private access grant requires --confirm.")
+    if (!microUuidValid(grantId)) return MicroResult(false, "Private grant ID must be a UUID.")
+    microLinkedOperation(
+        api, "DELETE", "/private-grants/$grantId", "", "Revoked the private access grant."
+    )
+}
+
 fun microDurationSeconds(value: string): int {
     if (value.size < 2) return 0
     val unit = value[value.size - 1]
@@ -1024,7 +1249,7 @@ fun microRun(): MicroCommandResult {
     if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
         return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
     if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.5.0"), jsonOutput)
+        return MicroCommandResult(MicroResult(true, "micro 0.6.0"), jsonOutput)
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
     val command = linuxArgument(index)
@@ -1055,6 +1280,36 @@ fun microRun(): MicroCommandResult {
         linuxArgument(index + 1) == "status" &&
         linuxArgument(index + 2) == "--wait")
         microAccountStatus(api, true)
+    else if (command == "plans" && index + 1 == count) microPlans(api)
+    else if (command == "usage" && index + 1 == count) microUsageStatus(api)
+    else if (command == "spending-cap" && index + 6 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--monthly-cents" &&
+        linuxArgument(index + 4) == "--warning-percent")
+        microSetSpendingCap(
+            api, microNonNegativeInt(linuxArgument(index + 3), -1, 1000000),
+            microPositiveInt(linuxArgument(index + 5), -1, 100), true
+        )
+    else if (command == "spending-cap" && index + 7 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--monthly-cents" &&
+        linuxArgument(index + 4) == "--warning-percent" &&
+        linuxArgument(index + 6) == "--soft")
+        microSetSpendingCap(
+            api, microNonNegativeInt(linuxArgument(index + 3), -1, 1000000),
+            microPositiveInt(linuxArgument(index + 5), -1, 100), false
+        )
+    else if (command == "spending-cap" && index + 3 == count &&
+        linuxArgument(index + 1) == "delete" &&
+        linuxArgument(index + 2) == "--confirm") microDeleteSpendingCap(api, true)
+    else if (command == "spending-cap" && index + 2 == count &&
+        linuxArgument(index + 1) == "delete") microDeleteSpendingCap(api, false)
+    else if (command == "billing" && index + 1 == count) microBillingStatus(api)
+    else if (command == "billing" && index + 3 == count &&
+        linuxArgument(index + 1) == "checkout")
+        microBillingCheckout(api, linuxArgument(index + 2))
+    else if (command == "billing" && index + 2 == count &&
+        linuxArgument(index + 1) == "portal") microBillingPortal(api)
     else if (command == "login" && index + 1 == count) microLogin(api)
     else if (command == "logout" && index + 1 == count) microLogout()
     else if (command == "projects" && index + 1 == count) microProjects(api)
@@ -1088,6 +1343,88 @@ fun microRun(): MicroCommandResult {
         linuxArgument(index + 3) == "--accept-live-products")
         microDeploySite(api, linuxArgument(index + 1), false, true, true)
     else if (command == "status" && index + 1 == count) microProjectStatus(api)
+    else if (command == "settings" && index + 1 == count) microProjectSettings(api)
+    else if (command == "settings" && index + 4 == count &&
+        linuxArgument(index + 1) == "visibility" &&
+        linuxArgument(index + 3) == "--confirm")
+        microSetProjectVisibility(api, linuxArgument(index + 2), true)
+    else if (command == "settings" && index + 3 == count &&
+        linuxArgument(index + 1) == "visibility")
+        microSetProjectVisibility(api, linuxArgument(index + 2), false)
+    else if (command == "members" && index + 1 == count) microProjectMembers(api)
+    else if (command == "members" && index + 4 == count &&
+        linuxArgument(index + 1) == "set")
+        microSetProjectMember(
+            api, linuxArgument(index + 2), linuxArgument(index + 3), false
+        )
+    else if (command == "members" && index + 5 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 4) == "--can-promote")
+        microSetProjectMember(
+            api, linuxArgument(index + 2), linuxArgument(index + 3), true
+        )
+    else if (command == "members" && index + 4 == count &&
+        linuxArgument(index + 1) == "remove" &&
+        linuxArgument(index + 3) == "--confirm")
+        microRemoveProjectMember(api, linuxArgument(index + 2), true)
+    else if (command == "members" && index + 3 == count &&
+        linuxArgument(index + 1) == "remove")
+        microRemoveProjectMember(api, linuxArgument(index + 2), false)
+    else if (command == "invitations" && index + 1 == count)
+        microProjectInvitations(api)
+    else if (command == "invitations" && index + 4 == count &&
+        linuxArgument(index + 1) == "create")
+        microCreateProjectInvitation(
+            api, linuxArgument(index + 2), linuxArgument(index + 3), false
+        )
+    else if (command == "invitations" && index + 5 == count &&
+        linuxArgument(index + 1) == "create" &&
+        linuxArgument(index + 4) == "--can-promote")
+        microCreateProjectInvitation(
+            api, linuxArgument(index + 2), linuxArgument(index + 3), true
+        )
+    else if (command == "invitations" && index + 4 == count &&
+        linuxArgument(index + 1) == "revoke" &&
+        linuxArgument(index + 3) == "--confirm")
+        microRevokeProjectInvitation(api, linuxArgument(index + 2), true)
+    else if (command == "invitations" && index + 3 == count &&
+        linuxArgument(index + 1) == "revoke")
+        microRevokeProjectInvitation(api, linuxArgument(index + 2), false)
+    else if (command == "invitations" && index + 3 == count &&
+        linuxArgument(index + 1) == "accept" &&
+        linuxArgument(index + 2) == "--token-stdin")
+        microAcceptProjectInvitation(api, true)
+    else if (command == "domains" && index + 1 == count) microProjectDomains(api)
+    else if (command == "domains" && index + 3 == count &&
+        linuxArgument(index + 1) == "add")
+        microAddProjectDomain(api, linuxArgument(index + 2))
+    else if (command == "domains" && index + 3 == count &&
+        linuxArgument(index + 1) == "verify")
+        microVerifyProjectDomain(api, linuxArgument(index + 2))
+    else if (command == "domains" && index + 4 == count &&
+        linuxArgument(index + 1) == "remove" &&
+        linuxArgument(index + 3) == "--confirm")
+        microRemoveProjectDomain(api, linuxArgument(index + 2), true)
+    else if (command == "domains" && index + 3 == count &&
+        linuxArgument(index + 1) == "remove")
+        microRemoveProjectDomain(api, linuxArgument(index + 2), false)
+    else if (command == "private-grants" && index + 1 == count)
+        microProjectPrivateGrants(api)
+    else if (command == "private-grants" && index + 6 == count &&
+        linuxArgument(index + 1) == "create" &&
+        linuxArgument(index + 2) == "--expires-days" &&
+        linuxArgument(index + 4) == "--label")
+        microCreateProjectPrivateGrant(
+            api, microPositiveInt(linuxArgument(index + 3), -1, 365),
+            linuxArgument(index + 5)
+        )
+    else if (command == "private-grants" && index + 4 == count &&
+        linuxArgument(index + 1) == "revoke" &&
+        linuxArgument(index + 3) == "--confirm")
+        microRevokeProjectPrivateGrant(api, linuxArgument(index + 2), true)
+    else if (command == "private-grants" && index + 3 == count &&
+        linuxArgument(index + 1) == "revoke")
+        microRevokeProjectPrivateGrant(api, linuxArgument(index + 2), false)
     else if (command == "deployments" && index + 1 == count) microProjectDeployments(api)
     else if (command == "logs" && index + 3 == count &&
         linuxArgument(index + 1) == "--since")
