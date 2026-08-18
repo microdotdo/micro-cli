@@ -56,6 +56,8 @@ micro export records --limit 100 --offset 0 --json
 micro retention
 micro retention set --record-days 90 --automatic --confirm
 micro retention prune --expected-records 12 --confirm
+micro project deletions
+micro project delete --confirm-slug my-site --confirm
 micro pull my-site another-checkout
 ```
 
@@ -71,6 +73,11 @@ Retention defaults to keeping project records forever. A finite 30–3650 day
 policy can be manual or automatic, but it never prunes purchases or
 entitlements. Manual pruning requires the current preview count and
 `--confirm`, so a changed preview fails instead of deleting a different set.
+Project deletion is linked to the exact project ID in `.micro/project.json` and
+requires both the typed slug and `--confirm`. The project disappears from the
+runner immediately, its slug remains reserved for 30 days, and protected-object
+cleanup finishes asynchronously behind a durable receipt. The CLI never removes
+the local source tree; export anything needed before requesting remote deletion.
 
 ## GitHub Actions
 

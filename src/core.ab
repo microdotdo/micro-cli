@@ -177,6 +177,14 @@ fun microRetentionPolicyValid(recordDays: int, automatic: bool): bool =
     (recordDays == 0 || (recordDays >= 30 && recordDays <= 3650)) &&
     (!automatic || recordDays >= 30)
 
+fun microProjectDeletionConfirmationValid(
+    projectId: string,
+    linkedSlug: string,
+    confirmedSlug: string,
+    confirmed: bool
+): bool = confirmed && microUuidValid(projectId) && microSlugValid(linkedSlug) &&
+    confirmedSlug == linkedSlug
+
 fun microParseApi(value: string): MicroApi {
     var origin = value
     while (origin.size > 0 && origin[origin.size - 1] == 47)

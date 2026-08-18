@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] project deletions [--json]\n  micro [--api URL] project delete --confirm-slug SLUG --confirm [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -679,6 +679,57 @@ fun microProjects(api: MicroApi): MicroResult {
     else MicroResult(false, response.message)
 }
 
+fun microProjectDeletions(api: MicroApi): MicroResult {
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "GET", "/api/v1/project-deletions?limit=100", "", "application/json",
+        credentials.accessToken
+    )
+    if (response.succeeded) MicroResult(true, response.response.body, response.response.body)
+    else MicroResult(false, response.message)
+}
+
+fun microDeleteProject(
+    api: MicroApi,
+    confirmedSlug: string,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed)
+        return MicroResult(false, "Project deletion requires --confirm and the exact linked slug with --confirm-slug.")
+    val project = microLocalProject()
+    if (!project.valid || !microUuidValid(project.projectId))
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    if (!microProjectDeletionConfirmationValid(
+        project.projectId, project.slug, confirmedSlug, confirmed
+    )) return MicroResult(
+        false,
+        "--confirm-slug must exactly match the linked slug '${project.slug}'; nothing was deleted."
+    )
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "DELETE", "/api/v1/projects/${project.slug}",
+        jsonStringify(jsonObject(
+            ["project_id", "slug"],
+            [jsonString(project.projectId), jsonString(project.slug)]
+        )), "application/json", credentials.accessToken, 1048576,
+        [HttpHeader("X-Micro-Confirm-Project-Delete", "true")]
+    )
+    if (!response.succeeded) return MicroResult(false, response.message)
+    val parsed = jsonParse(response.response.body)
+    if (!parsed.succeeded || !parsed.value.isObject() ||
+        !microUuidValid(parsed.value.getString("id")))
+        return MicroResult(false, "micro.do returned an invalid project-deletion receipt.")
+    val receiptId = parsed.value.getString("id")
+    val status = parsed.value.getString("status")
+    MicroResult(
+        true,
+        "Project ${project.slug} is hidden and deletion receipt $receiptId is $status. The remote slug is reserved for 30 days; local source was not removed.",
+        response.response.body
+    )
+}
+
 class MicroLocalProject(
     val valid: bool,
     val projectId: string,
@@ -908,6 +959,17 @@ fun microRun(): MicroCommandResult {
     else if (command == "login" && index + 1 == count) microLogin(api)
     else if (command == "logout" && index + 1 == count) microLogout()
     else if (command == "projects" && index + 1 == count) microProjects(api)
+    else if (command == "project" && index + 2 == count &&
+        linuxArgument(index + 1) == "deletions") microProjectDeletions(api)
+    else if (command == "project" && index + 5 == count &&
+        linuxArgument(index + 1) == "delete" &&
+        linuxArgument(index + 2) == "--confirm-slug" &&
+        linuxArgument(index + 4) == "--confirm")
+        microDeleteProject(api, linuxArgument(index + 3), true)
+    else if (command == "project" && index + 4 == count &&
+        linuxArgument(index + 1) == "delete" &&
+        linuxArgument(index + 2) == "--confirm-slug")
+        microDeleteProject(api, linuxArgument(index + 3), false)
     else if (command == "deploy" && index + 2 == count &&
         linuxArgument(index + 1) == "--preview")
         microDeploySite(api, "", true)
