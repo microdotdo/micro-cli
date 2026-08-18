@@ -22,10 +22,10 @@ install -Dm755 micro-linux-x86_64 "$HOME/.local/bin/micro"
 micro login
 ```
 
-On Apple Silicon, replace the two asset names above with
-`micro-macos-arm64`; on an Intel Mac, use `micro-macos-x86_64`. Verify with
-`shasum -a 256 --check <asset>.sha256`, then install the executable as
-`$HOME/.local/bin/micro`.
+On macOS, install the runtime TLS library with `brew install openssl@3`. On
+Apple Silicon, replace the two asset names above with `micro-macos-arm64`; on
+an Intel Mac, use `micro-macos-x86_64`. Verify with `shasum -a 256 --check
+<asset>.sha256`, then install the executable as `$HOME/.local/bin/micro`.
 
 To install from source instead, install the
 [Abla compiler](https://github.com/AndreBaltazar8/ablac), then:

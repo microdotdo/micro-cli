@@ -79,6 +79,7 @@ jobs:
           make test build ABLAC_DIR="$RUNNER_TEMP/ablac" COMPILER="$RUNNER_TEMP/ablac/build/ablac"
           test "$(build/micro --version)" = "micro ${RELEASE_TAG#v}"
           test "$(uname -m)" = "${{ matrix.architecture }}"
+          otool -L build/micro | grep -F '/opt/openssl@3/lib/libssl.3.dylib'
           mv build/micro "build/micro-macos-${{ matrix.architecture }}"
           cd build
           shasum -a 256 "micro-macos-${{ matrix.architecture }}" > "micro-macos-${{ matrix.architecture }}.sha256"
