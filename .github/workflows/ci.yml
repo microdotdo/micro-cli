@@ -11,7 +11,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      ABLAC_COMMIT: 357c9591643feb89f68ba8cd0a3b0bcb23858a90
+      ABLAC_COMMIT: 946d112a649c4f4fc6f4e156251c10c2d2095985
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
