@@ -2,7 +2,7 @@ compile fun microAblaCliSource(): ImportSource = gitImportSource(
     "abla-cli",
     "https://github.com/AndreBaltazar8/abla-cli.git",
     "tag",
-    "v0.1.2"
+    "v0.1.3"
 )
 
 import microAblaCliSource()
@@ -87,7 +87,7 @@ fun microCli(): CliApp = cliApplication(
         ]),
         microCommand("emails", "Inspect transactional email activity"),
         microCommand("deployments", "List project deployments"),
-        microCommand("logs", "Read project logs", [], [microOpt("since", "--since", "DURATION", "Log window", false)]),
+        microCommand("logs", "Read project logs", [], [microOpt("since", "--since", "DURATION", "Log window", true)]),
         microCommand("users", "List application users", [], [], [
             microCommand("disable", "Disable an application user", [microArg("user-id", "Application-user UUID")], [microFlag("confirm", "--confirm", "Confirm disablement")]),
             microCommand("enable", "Enable an application user", [microArg("user-id", "Application-user UUID")]),

@@ -5,8 +5,9 @@
 The command tree is defined with
 [`abla-cli`](https://github.com/AndreBaltazar8/abla-cli). Root and subcommand
 help, positional arguments, required options, defaults, and inherited options
-are generated from the same typed schema used to validate invocations; run
-`micro <command> --help` for the exact contract.
+are generated from the same typed schema used to validate invocations and pass
+matched values into command execution. The CLI does not maintain a second raw
+argument parser; run `micro <command> --help` for the exact contract.
 
 ## Install
 

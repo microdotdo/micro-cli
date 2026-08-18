@@ -1411,436 +1411,199 @@ fun microOpenProject(): MicroResult {
 class MicroCommandResult(val result: MicroResult, val json: bool)
 
 fun microRun(): MicroCommandResult {
-    val schema = microCli().parseProcess()
+    val app = microCli()
+    val schema = app.parseProcess()
     if (schema.succeeded && (schema.kind == "help" || schema.kind == "version"))
         return MicroCommandResult(MicroResult(true, schema.message), schema.has("json"))
     if (!schema.succeeded)
         return MicroCommandResult(MicroResult(false, schema.message), schema.has("json"))
-    var count = linuxArgumentCount()
-    val jsonOutput = count > 0 && linuxArgument(count - 1) == "--json"
-    if (jsonOutput) count = count - 1
+    val jsonOutput = schema.has("json")
     var apiValue = "https://micro.do"
     val configured = linuxEnvironment("MICRO_API")
     if (configured.found && configured.value != "") apiValue = configured.value
-    var index = 0
-    if (index < count && linuxArgument(index) == "--api") {
-        if (index + 1 >= count) return MicroCommandResult(MicroResult(false, "--api requires a URL.\n${microUsage()}"), jsonOutput)
-        apiValue = linuxArgument(index + 1)
-        index = index + 2
-    }
-    if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
-        return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
-    if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.8.2"), jsonOutput)
+    if (schema.has("api")) apiValue = schema.value("api")
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
-    val command = linuxArgument(index)
-    val result = if (command == "new" && index + 2 == count)
-        microNewProject(linuxArgument(index + 1))
-    else if (command == "pull" && index + 2 == count)
-        microPullProject(api, linuxArgument(index + 1), linuxArgument(index + 1))
-    else if (command == "pull" && index + 3 == count)
-        microPullProject(api, linuxArgument(index + 1), linuxArgument(index + 2))
-    else if (command == "gallery" && index + 1 == count)
-        microGallery(api)
-    else if (command == "remix" && index + 2 == count)
-        microRemix(api, linuxArgument(index + 1), linuxArgument(index + 1))
-    else if (command == "remix" && index + 3 == count)
-        microRemix(api, linuxArgument(index + 1), linuxArgument(index + 2))
-    else if (command == "build" && index + 1 == count)
-        microBuildProject(path("."))
-    else if (command == "dev" && index + 1 == count)
-        microDev()
-    else if (command == "dev" && index + 3 == count &&
-        linuxArgument(index + 1) == "--port")
-        microDev(microParsePort(linuxArgument(index + 2), -1))
-    else if (command == "signup" && index + 3 == count &&
-        linuxArgument(index + 1) == "--email")
-        microSignup(api, linuxArgument(index + 2), false)
-    else if (command == "signup" && index + 4 == count &&
-        linuxArgument(index + 1) == "--email" &&
-        linuxArgument(index + 3) == "--password-stdin")
-        microSignup(api, linuxArgument(index + 2), true)
-    else if (command == "account" && index + 2 == count &&
-        linuxArgument(index + 1) == "status")
-        microAccountStatus(api)
-    else if (command == "account" && index + 3 == count &&
-        linuxArgument(index + 1) == "status" &&
-        linuxArgument(index + 2) == "--wait")
-        microAccountStatus(api, true)
-    else if (command == "plans" && index + 1 == count) microPlans(api)
-    else if (command == "platform" && index + 2 == count &&
-        linuxArgument(index + 1) == "status") microPlatformStatus(api)
-    else if (command == "usage" && index + 1 == count) microUsageStatus(api)
-    else if (command == "spending-cap" && index + 6 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--monthly-cents" &&
-        linuxArgument(index + 4) == "--warning-percent")
+    val result = if (schema.isCommand("new"))
+        microNewProject(schema.argument(0))
+    else if (schema.isCommand("pull"))
+        microPullProject(api, schema.argument(0), schema.argument(1, schema.argument(0)))
+    else if (schema.isCommand("gallery")) microGallery(api)
+    else if (schema.isCommand("remix"))
+        microRemix(api, schema.argument(0), schema.argument(1, schema.argument(0)))
+    else if (schema.isCommand("build")) microBuildProject(path("."))
+    else if (schema.isCommand("dev") && schema.has("port"))
+        microDev(microParsePort(schema.value("port"), -1))
+    else if (schema.isCommand("dev")) microDev()
+    else if (schema.isCommand("signup"))
+        microSignup(api, schema.value("email"), schema.has("password-stdin"))
+    else if (schema.isCommand("login")) microLogin(api)
+    else if (schema.isCommand("logout")) microLogout(api)
+    else if (schema.isCommand("account status")) microAccountStatus(api, schema.has("wait"))
+    else if (schema.isCommand("plans")) microPlans(api)
+    else if (schema.isCommand("platform status")) microPlatformStatus(api)
+    else if (schema.isCommand("usage")) microUsageStatus(api)
+    else if (schema.isCommand("spending-cap set"))
         microSetSpendingCap(
-            api, microNonNegativeInt(linuxArgument(index + 3), -1, 1000000),
-            microPositiveInt(linuxArgument(index + 5), -1, 100), true
+            api, microNonNegativeInt(schema.value("monthly-cents"), -1, 1000000),
+            microPositiveInt(schema.value("warning-percent"), -1, 100),
+            !schema.has("soft")
         )
-    else if (command == "spending-cap" && index + 7 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--monthly-cents" &&
-        linuxArgument(index + 4) == "--warning-percent" &&
-        linuxArgument(index + 6) == "--soft")
-        microSetSpendingCap(
-            api, microNonNegativeInt(linuxArgument(index + 3), -1, 1000000),
-            microPositiveInt(linuxArgument(index + 5), -1, 100), false
-        )
-    else if (command == "spending-cap" && index + 3 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 2) == "--confirm") microDeleteSpendingCap(api, true)
-    else if (command == "spending-cap" && index + 2 == count &&
-        linuxArgument(index + 1) == "delete") microDeleteSpendingCap(api, false)
-    else if (command == "billing" && index + 1 == count) microBillingStatus(api)
-    else if (command == "billing" && index + 3 == count &&
-        linuxArgument(index + 1) == "checkout")
-        microBillingCheckout(api, linuxArgument(index + 2))
-    else if (command == "billing" && index + 2 == count &&
-        linuxArgument(index + 1) == "portal") microBillingPortal(api)
-    else if (command == "login" && index + 1 == count) microLogin(api)
-    else if (command == "logout" && index + 1 == count) microLogout(api)
-    else if (command == "projects" && index + 1 == count) microProjects(api)
-    else if (command == "project" && index + 2 == count &&
-        linuxArgument(index + 1) == "deletions") microProjectDeletions(api)
-    else if (command == "project" && index + 5 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 2) == "--confirm-slug" &&
-        linuxArgument(index + 4) == "--confirm")
-        microDeleteProject(api, linuxArgument(index + 3), true)
-    else if (command == "project" && index + 4 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 2) == "--confirm-slug")
-        microDeleteProject(api, linuxArgument(index + 3), false)
-    else if (command == "deploy" && index + 2 == count &&
-        linuxArgument(index + 1) == "--preview")
+    else if (schema.isCommand("spending-cap delete"))
+        microDeleteSpendingCap(api, schema.has("confirm"))
+    else if (schema.isCommand("billing")) microBillingStatus(api)
+    else if (schema.isCommand("billing checkout"))
+        microBillingCheckout(api, schema.argument(0))
+    else if (schema.isCommand("billing portal")) microBillingPortal(api)
+    else if (schema.isCommand("deploy") && schema.has("github") &&
+        (schema.has("preview") || schema.argument(0) != "" ||
+         schema.has("accept-price-changes") || schema.has("accept-live-products")))
+        MicroResult(false, "--github cannot be combined with a slug, --preview, or product acceptance flags.")
+    else if (schema.isCommand("deploy") && schema.has("github"))
+        microDeployGithub(api, schema.has("prebuilt"))
+    else if (schema.isCommand("deploy") && schema.has("preview") &&
+        (schema.argument(0) != "" || schema.has("prebuilt") ||
+         schema.has("accept-price-changes") || schema.has("accept-live-products")))
+        MicroResult(false, "--preview cannot be combined with a slug, --prebuilt, or product acceptance flags.")
+    else if (schema.isCommand("deploy") && schema.has("preview"))
         microDeploySite(api, "", true)
-    else if (command == "deploy" && index + 2 == count &&
-        linuxArgument(index + 1) == "--github")
-        microDeployGithub(api)
-    else if (command == "deploy" && index + 3 == count &&
-        linuxArgument(index + 1) == "--github" &&
-        linuxArgument(index + 2) == "--prebuilt")
-        microDeployGithub(api, true)
-    else if (command == "deploy" && index + 2 == count)
-        microDeploySite(api, linuxArgument(index + 1), false)
-    else if (command == "deploy" && index + 3 == count &&
-        linuxArgument(index + 2) == "--accept-price-changes")
-        microDeploySite(api, linuxArgument(index + 1), false, true)
-    else if (command == "deploy" && index + 3 == count &&
-        linuxArgument(index + 2) == "--accept-live-products")
-        microDeploySite(api, linuxArgument(index + 1), false, false, true)
-    else if (command == "deploy" && index + 4 == count &&
-        linuxArgument(index + 2) == "--accept-price-changes" &&
-        linuxArgument(index + 3) == "--accept-live-products")
-        microDeploySite(api, linuxArgument(index + 1), false, true, true)
-    else if (command == "status" && index + 1 == count) microProjectStatus(api)
-    else if (command == "settings" && index + 1 == count) microProjectSettings(api)
-    else if (command == "settings" && index + 4 == count &&
-        linuxArgument(index + 1) == "visibility" &&
-        linuxArgument(index + 3) == "--confirm")
-        microSetProjectVisibility(api, linuxArgument(index + 2), true)
-    else if (command == "settings" && index + 3 == count &&
-        linuxArgument(index + 1) == "visibility")
-        microSetProjectVisibility(api, linuxArgument(index + 2), false)
-    else if (command == "members" && index + 1 == count) microProjectMembers(api)
-    else if (command == "members" && index + 4 == count &&
-        linuxArgument(index + 1) == "set")
-        microSetProjectMember(
-            api, linuxArgument(index + 2), linuxArgument(index + 3), false
+    else if (schema.isCommand("deploy") && schema.has("prebuilt"))
+        MicroResult(false, "--prebuilt requires --github.")
+    else if (schema.isCommand("deploy"))
+        microDeploySite(
+            api, schema.argument(0), false,
+            schema.has("accept-price-changes"), schema.has("accept-live-products")
         )
-    else if (command == "members" && index + 5 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 4) == "--can-promote")
-        microSetProjectMember(
-            api, linuxArgument(index + 2), linuxArgument(index + 3), true
-        )
-    else if (command == "members" && index + 4 == count &&
-        linuxArgument(index + 1) == "remove" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRemoveProjectMember(api, linuxArgument(index + 2), true)
-    else if (command == "members" && index + 3 == count &&
-        linuxArgument(index + 1) == "remove")
-        microRemoveProjectMember(api, linuxArgument(index + 2), false)
-    else if (command == "invitations" && index + 1 == count)
-        microProjectInvitations(api)
-    else if (command == "invitations" && index + 4 == count &&
-        linuxArgument(index + 1) == "create")
-        microCreateProjectInvitation(
-            api, linuxArgument(index + 2), linuxArgument(index + 3), false
-        )
-    else if (command == "invitations" && index + 5 == count &&
-        linuxArgument(index + 1) == "create" &&
-        linuxArgument(index + 4) == "--can-promote")
-        microCreateProjectInvitation(
-            api, linuxArgument(index + 2), linuxArgument(index + 3), true
-        )
-    else if (command == "invitations" && index + 4 == count &&
-        linuxArgument(index + 1) == "revoke" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRevokeProjectInvitation(api, linuxArgument(index + 2), true)
-    else if (command == "invitations" && index + 3 == count &&
-        linuxArgument(index + 1) == "revoke")
-        microRevokeProjectInvitation(api, linuxArgument(index + 2), false)
-    else if (command == "invitations" && index + 3 == count &&
-        linuxArgument(index + 1) == "accept" &&
-        linuxArgument(index + 2) == "--token-stdin")
-        microAcceptProjectInvitation(api, true)
-    else if (command == "domains" && index + 1 == count) microProjectDomains(api)
-    else if (command == "domains" && index + 3 == count &&
-        linuxArgument(index + 1) == "add")
-        microAddProjectDomain(api, linuxArgument(index + 2))
-    else if (command == "domains" && index + 3 == count &&
-        linuxArgument(index + 1) == "verify")
-        microVerifyProjectDomain(api, linuxArgument(index + 2))
-    else if (command == "domains" && index + 4 == count &&
-        linuxArgument(index + 1) == "remove" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRemoveProjectDomain(api, linuxArgument(index + 2), true)
-    else if (command == "domains" && index + 3 == count &&
-        linuxArgument(index + 1) == "remove")
-        microRemoveProjectDomain(api, linuxArgument(index + 2), false)
-    else if (command == "private-grants" && index + 1 == count)
-        microProjectPrivateGrants(api)
-    else if (command == "private-grants" && index + 6 == count &&
-        linuxArgument(index + 1) == "create" &&
-        linuxArgument(index + 2) == "--expires-days" &&
-        linuxArgument(index + 4) == "--label")
-        microCreateProjectPrivateGrant(
-            api, microPositiveInt(linuxArgument(index + 3), -1, 365),
-            linuxArgument(index + 5)
-        )
-    else if (command == "private-grants" && index + 4 == count &&
-        linuxArgument(index + 1) == "revoke" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRevokeProjectPrivateGrant(api, linuxArgument(index + 2), true)
-    else if (command == "private-grants" && index + 3 == count &&
-        linuxArgument(index + 1) == "revoke")
-        microRevokeProjectPrivateGrant(api, linuxArgument(index + 2), false)
-    else if (command == "schedules" && index + 1 == count)
-        microProjectSchedules(api)
-    else if (command == "schedules" && index + 5 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 3) == "--every-minutes")
-        microSetProjectSchedule(
-            api, linuxArgument(index + 2),
-            microPositiveInt(linuxArgument(index + 4), -1, 10080)
-        )
-    else if (command == "schedules" && index + 6 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 3) == "--every-minutes" &&
-        linuxArgument(index + 5) == "--disabled")
-        microSetProjectSchedule(
-            api, linuxArgument(index + 2),
-            microPositiveInt(linuxArgument(index + 4), -1, 10080), "", false
-        )
-    else if (command == "schedules" && index + 7 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 3) == "--every-minutes" &&
-        linuxArgument(index + 5) == "--payload-file")
-        microSetProjectSchedule(
-            api, linuxArgument(index + 2),
-            microPositiveInt(linuxArgument(index + 4), -1, 10080),
-            linuxArgument(index + 6)
-        )
-    else if (command == "schedules" && index + 8 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 3) == "--every-minutes" &&
-        linuxArgument(index + 5) == "--payload-file" &&
-        linuxArgument(index + 7) == "--disabled")
-        microSetProjectSchedule(
-            api, linuxArgument(index + 2),
-            microPositiveInt(linuxArgument(index + 4), -1, 10080),
-            linuxArgument(index + 6), false
-        )
-    else if (command == "schedules" && index + 4 == count &&
-        linuxArgument(index + 1) == "run" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRunProjectSchedule(api, linuxArgument(index + 2), true)
-    else if (command == "schedules" && index + 3 == count &&
-        linuxArgument(index + 1) == "run")
-        microRunProjectSchedule(api, linuxArgument(index + 2), false)
-    else if (command == "schedules" && index + 4 == count &&
-        linuxArgument(index + 1) == "remove" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRemoveProjectSchedule(api, linuxArgument(index + 2), true)
-    else if (command == "schedules" && index + 3 == count &&
-        linuxArgument(index + 1) == "remove")
-        microRemoveProjectSchedule(api, linuxArgument(index + 2), false)
-    else if (command == "emails" && index + 1 == count)
-        microProjectEmails(api)
-    else if (command == "deployments" && index + 1 == count) microProjectDeployments(api)
-    else if (command == "logs" && index + 3 == count &&
-        linuxArgument(index + 1) == "--since")
-        microProjectLogs(api, linuxArgument(index + 2))
-    else if (command == "users" && index + 1 == count) microUsers(api)
-    else if (command == "users" && index + 4 == count &&
-        linuxArgument(index + 1) == "disable" &&
-        linuxArgument(index + 3) == "--confirm")
-        microDisableUser(api, linuxArgument(index + 2), true)
-    else if (command == "users" && index + 3 == count &&
-        linuxArgument(index + 1) == "disable")
-        microDisableUser(api, linuxArgument(index + 2), false)
-    else if (command == "users" && index + 3 == count &&
-        linuxArgument(index + 1) == "enable")
-        microEnableUser(api, linuxArgument(index + 2))
-    else if (command == "users" && index + 4 == count &&
-        linuxArgument(index + 1) == "revoke-sessions" &&
-        linuxArgument(index + 3) == "--confirm")
-        microRevokeUserSessions(api, linuxArgument(index + 2), true)
-    else if (command == "users" && index + 3 == count &&
-        linuxArgument(index + 1) == "revoke-sessions")
-        microRevokeUserSessions(api, linuxArgument(index + 2), false)
-    else if (command == "records" && index + 1 == count) microRecords(api)
-    else if (command == "records" && index + 9 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 6) == "--version" &&
-        linuxArgument(index + 8) == "--confirm")
-        microDeleteRecord(
-            api, linuxArgument(index + 2), linuxArgument(index + 3),
-            linuxArgument(index + 4), linuxArgument(index + 5),
-            microPositiveInt(linuxArgument(index + 7), -1), true
-        )
-    else if (command == "records" && index + 8 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 6) == "--version")
-        microDeleteRecord(
-            api, linuxArgument(index + 2), linuxArgument(index + 3),
-            linuxArgument(index + 4), linuxArgument(index + 5),
-            microPositiveInt(linuxArgument(index + 7), -1), false
-        )
-    else if (command == "backups" && index + 1 == count) microBackups(api)
-    else if (command == "backups" && index + 3 == count &&
-        linuxArgument(index + 1) == "create" &&
-        linuxArgument(index + 2) == "--confirm")
-        microCreateBackup(api, true)
-    else if (command == "backups" && index + 2 == count &&
-        linuxArgument(index + 1) == "create")
-        microCreateBackup(api, false)
-    else if (command == "backups" && index + 8 == count &&
-        linuxArgument(index + 1) == "restore" &&
-        linuxArgument(index + 3) == "--backup-sha256" &&
-        linuxArgument(index + 5) == "--expected-current-sha256" &&
-        linuxArgument(index + 7) == "--confirm")
-        microRestoreBackup(
-            api, linuxArgument(index + 2), linuxArgument(index + 4),
-            linuxArgument(index + 6), true
-        )
-    else if (command == "backups" && index + 7 == count &&
-        linuxArgument(index + 1) == "restore" &&
-        linuxArgument(index + 3) == "--backup-sha256" &&
-        linuxArgument(index + 5) == "--expected-current-sha256")
-        microRestoreBackup(
-            api, linuxArgument(index + 2), linuxArgument(index + 4),
-            linuxArgument(index + 6), false
-        )
-    else if (command == "backups" && index + 6 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 3) == "--sha256" &&
-        linuxArgument(index + 5) == "--confirm")
-        microDeleteBackup(
-            api, linuxArgument(index + 2), linuxArgument(index + 4), true
-        )
-    else if (command == "backups" && index + 5 == count &&
-        linuxArgument(index + 1) == "delete" &&
-        linuxArgument(index + 3) == "--sha256")
-        microDeleteBackup(
-            api, linuxArgument(index + 2), linuxArgument(index + 4), false
-        )
-    else if (command == "purchases" && index + 1 == count) microPurchases(api)
-    else if (command == "audit" && index + 1 == count) microAudit(api)
-    else if (command == "export" && index + 1 == count) microExport(api)
-    else if (command == "export" && index + 2 == count)
-        microExport(api, linuxArgument(index + 1))
-    else if (command == "export" && index + 6 == count &&
-        linuxArgument(index + 2) == "--limit" &&
-        linuxArgument(index + 4) == "--offset")
-        microExport(
-            api, linuxArgument(index + 1),
-            microPositiveInt(linuxArgument(index + 3), -1, 100),
-            microNonNegativeInt(linuxArgument(index + 5), -1, 100000)
-        )
-    else if (command == "retention" && index + 1 == count) microRetention(api)
-    else if (command == "retention" && index + 5 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--record-days" &&
-        linuxArgument(index + 4) == "--confirm")
-        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), false, true)
-    else if (command == "retention" && index + 6 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--record-days" &&
-        linuxArgument(index + 4) == "--automatic" &&
-        linuxArgument(index + 5) == "--confirm")
-        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), true, true)
-    else if (command == "retention" && index + 4 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--record-days")
-        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), false, false)
-    else if (command == "retention" && index + 5 == count &&
-        linuxArgument(index + 1) == "set" &&
-        linuxArgument(index + 2) == "--record-days" &&
-        linuxArgument(index + 4) == "--automatic")
-        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), true, false)
-    else if (command == "retention" && index + 5 == count &&
-        linuxArgument(index + 1) == "prune" &&
-        linuxArgument(index + 2) == "--expected-records" &&
-        linuxArgument(index + 4) == "--confirm")
-        microPruneRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 10000), true)
-    else if (command == "retention" && index + 4 == count &&
-        linuxArgument(index + 1) == "prune" &&
-        linuxArgument(index + 2) == "--expected-records")
-        microPruneRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 10000), false)
-    else if (command == "rollback" && index + 2 == count)
-        microProjectRollback(api, linuxArgument(index + 1))
-    else if (command == "products" && index + 1 == count) microProducts(api)
-    else if (command == "products" && index + 2 == count &&
-        linuxArgument(index + 1) == "sync") microSyncProducts(api)
-    else if (command == "products" && index + 3 == count &&
-        linuxArgument(index + 1) == "sync" &&
-        linuxArgument(index + 2) == "--accept-price-changes")
-        microSyncProducts(api, true)
-    else if (command == "products" && index + 3 == count &&
-        linuxArgument(index + 1) == "sync" &&
-        linuxArgument(index + 2) == "--accept-live-products")
-        microSyncProducts(api, false, true)
-    else if (command == "products" && index + 4 == count &&
-        linuxArgument(index + 1) == "sync" &&
-        linuxArgument(index + 2) == "--accept-price-changes" &&
-        linuxArgument(index + 3) == "--accept-live-products")
-        microSyncProducts(api, true, true)
-    else if (command == "files" && index + 1 == count) microFiles(api)
-    else if (command == "files" && index + 4 == count &&
-        linuxArgument(index + 1) == "upload")
-        microUploadFile(api, linuxArgument(index + 2), linuxArgument(index + 3))
-    else if (command == "files" && index + 6 == count &&
-        linuxArgument(index + 1) == "upload" &&
-        linuxArgument(index + 4) == "--entitlement")
-        microUploadFile(
-            api, linuxArgument(index + 2), linuxArgument(index + 3),
-            "entitlement", linuxArgument(index + 5)
-        )
-    else if (command == "files" && index + 5 == count &&
-        linuxArgument(index + 1) == "upload" &&
-        linuxArgument(index + 4) == "--public")
-        microUploadFile(api, linuxArgument(index + 2), linuxArgument(index + 3), "public")
-    else if (command == "github" && index + 10 == count &&
-        linuxArgument(index + 1) == "link" &&
-        linuxArgument(index + 2) == "--repository" &&
-        linuxArgument(index + 4) == "--environment" &&
-        linuxArgument(index + 6) == "--ref" &&
-        linuxArgument(index + 8) == "--slug")
+    else if (schema.isCommand("github link"))
         microGithubLink(
-            api, linuxArgument(index + 3), linuxArgument(index + 5),
-            linuxArgument(index + 7), linuxArgument(index + 9)
+            api, schema.value("repository"), schema.value("environment"),
+            schema.value("ref"), schema.value("slug")
         )
-    else if (command == "github" && index + 2 == count &&
-        linuxArgument(index + 1) == "bindings") microGithubBindings(api)
-    else if (command == "github" && index + 3 == count &&
-        linuxArgument(index + 1) == "revoke")
-        microGithubRevoke(api, linuxArgument(index + 2))
-    else if (command == "open" && index + 1 == count) microOpenProject()
+    else if (schema.isCommand("github bindings")) microGithubBindings(api)
+    else if (schema.isCommand("github revoke"))
+        microGithubRevoke(api, schema.argument(0))
+    else if (schema.isCommand("projects")) microProjects(api)
+    else if (schema.isCommand("project deletions")) microProjectDeletions(api)
+    else if (schema.isCommand("project delete"))
+        microDeleteProject(api, schema.value("confirm-slug"), schema.has("confirm"))
+    else if (schema.isCommand("status")) microProjectStatus(api)
+    else if (schema.isCommand("settings")) microProjectSettings(api)
+    else if (schema.isCommand("settings visibility"))
+        microSetProjectVisibility(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("members")) microProjectMembers(api)
+    else if (schema.isCommand("members set"))
+        microSetProjectMember(
+            api, schema.argument(0), schema.argument(1), schema.has("can-promote")
+        )
+    else if (schema.isCommand("members remove"))
+        microRemoveProjectMember(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("invitations")) microProjectInvitations(api)
+    else if (schema.isCommand("invitations create"))
+        microCreateProjectInvitation(
+            api, schema.argument(0), schema.argument(1), schema.has("can-promote")
+        )
+    else if (schema.isCommand("invitations revoke"))
+        microRevokeProjectInvitation(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("invitations accept"))
+        microAcceptProjectInvitation(api, schema.has("token-stdin"))
+    else if (schema.isCommand("domains")) microProjectDomains(api)
+    else if (schema.isCommand("domains add"))
+        microAddProjectDomain(api, schema.argument(0))
+    else if (schema.isCommand("domains verify"))
+        microVerifyProjectDomain(api, schema.argument(0))
+    else if (schema.isCommand("domains remove"))
+        microRemoveProjectDomain(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("private-grants")) microProjectPrivateGrants(api)
+    else if (schema.isCommand("private-grants create"))
+        microCreateProjectPrivateGrant(
+            api, microPositiveInt(schema.value("expires-days"), -1, 365),
+            schema.value("label")
+        )
+    else if (schema.isCommand("private-grants revoke"))
+        microRevokeProjectPrivateGrant(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("schedules")) microProjectSchedules(api)
+    else if (schema.isCommand("schedules set"))
+        microSetProjectSchedule(
+            api, schema.argument(0),
+            microPositiveInt(schema.value("every-minutes"), -1, 10080),
+            if (schema.has("payload-file")) schema.value("payload-file") else "",
+            !schema.has("disabled")
+        )
+    else if (schema.isCommand("schedules run"))
+        microRunProjectSchedule(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("schedules remove"))
+        microRemoveProjectSchedule(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("emails")) microProjectEmails(api)
+    else if (schema.isCommand("deployments")) microProjectDeployments(api)
+    else if (schema.isCommand("logs")) microProjectLogs(api, schema.value("since"))
+    else if (schema.isCommand("users")) microUsers(api)
+    else if (schema.isCommand("users disable"))
+        microDisableUser(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("users enable"))
+        microEnableUser(api, schema.argument(0))
+    else if (schema.isCommand("users revoke-sessions"))
+        microRevokeUserSessions(api, schema.argument(0), schema.has("confirm"))
+    else if (schema.isCommand("records")) microRecords(api)
+    else if (schema.isCommand("records delete"))
+        microDeleteRecord(
+            api, schema.argument(0), schema.argument(1), schema.argument(2),
+            schema.argument(3), microPositiveInt(schema.value("version"), -1),
+            schema.has("confirm")
+        )
+    else if (schema.isCommand("backups")) microBackups(api)
+    else if (schema.isCommand("backups create"))
+        microCreateBackup(api, schema.has("confirm"))
+    else if (schema.isCommand("backups restore"))
+        microRestoreBackup(
+            api, schema.argument(0), schema.value("backup-sha256"),
+            schema.value("expected-current-sha256"), schema.has("confirm")
+        )
+    else if (schema.isCommand("backups delete"))
+        microDeleteBackup(
+            api, schema.argument(0), schema.value("sha256"), schema.has("confirm")
+        )
+    else if (schema.isCommand("purchases")) microPurchases(api)
+    else if (schema.isCommand("audit")) microAudit(api)
+    else if (schema.isCommand("export"))
+        microExport(
+            api, schema.argument(0),
+            if (schema.has("limit")) microPositiveInt(schema.value("limit"), -1, 100) else 100,
+            if (schema.has("offset")) microNonNegativeInt(schema.value("offset"), -1, 100000) else 0
+        )
+    else if (schema.isCommand("retention")) microRetention(api)
+    else if (schema.isCommand("retention set"))
+        microSetRetention(
+            api, microNonNegativeInt(schema.value("record-days"), -1, 3650),
+            schema.has("automatic"), schema.has("confirm")
+        )
+    else if (schema.isCommand("retention prune"))
+        microPruneRetention(
+            api, microNonNegativeInt(schema.value("expected-records"), -1, 10000),
+            schema.has("confirm")
+        )
+    else if (schema.isCommand("rollback"))
+        microProjectRollback(api, schema.argument(0))
+    else if (schema.isCommand("products")) microProducts(api)
+    else if (schema.isCommand("products sync"))
+        microSyncProducts(
+            api, schema.has("accept-price-changes"), schema.has("accept-live-products")
+        )
+    else if (schema.isCommand("files")) microFiles(api)
+    else if (schema.isCommand("files upload") &&
+        schema.has("entitlement") && schema.has("public"))
+        MicroResult(false, "--entitlement and --public are mutually exclusive.")
+    else if (schema.isCommand("files upload") && schema.has("entitlement"))
+        microUploadFile(
+            api, schema.argument(0), schema.argument(1),
+            "entitlement", schema.value("entitlement")
+        )
+    else if (schema.isCommand("files upload") && schema.has("public"))
+        microUploadFile(api, schema.argument(0), schema.argument(1), "public")
+    else if (schema.isCommand("files upload"))
+        microUploadFile(api, schema.argument(0), schema.argument(1))
+    else if (schema.isCommand("open")) microOpenProject()
+    else if (schema.path.size > 0 && app.command(schema.path).commands.size > 0)
+        MicroResult(true, app.help(schema.path))
     else MicroResult(false, "Invalid command.\n${microUsage()}")
     MicroCommandResult(result, jsonOutput)
 }
