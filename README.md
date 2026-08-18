@@ -2,6 +2,12 @@
 
 `micro` builds, previews, deploys, and maintains full-stack WebAssembly sites on [micro.do](https://micro.do).
 
+The command tree is defined with
+[`abla-cli`](https://github.com/AndreBaltazar8/abla-cli). Root and subcommand
+help, positional arguments, required options, defaults, and inherited options
+are generated from the same typed schema used to validate invocations; run
+`micro <command> --help` for the exact contract.
+
 ## Install
 
 Linux x86-64 releases include a checksum alongside the executable:

@@ -1,0 +1,113 @@
+import github("AndreBaltazar8/abla-cli")
+
+fun microArg(name: string, description: string, required: bool = true): CliArgument =
+    cliArgument(name, description, required)
+fun microOpt(id: string, long: string, value: string, description: string,
+    required: bool = false): CliOption = cliOption(id, long, "", value, description, required)
+fun microFlag(id: string, long: string, description: string): CliOption =
+    cliFlag(id, long, "", description)
+fun microCommand(name: string, description: string,
+    arguments: array<CliArgument> = [], options: array<CliOption> = [],
+    commands: array<CliCommand> = []): CliCommand =
+    cliCommand(name, description, [], options, arguments, commands)
+
+fun microCli(): CliApp = cliApplication(
+    "micro", "0.8.0", "Build, deploy, and operate small full-stack sites on micro.do",
+    [
+        cliOption("api", "--api", "", "URL", "micro.do API base URL", false, true, "https://micro.do"),
+        cliFlag("json", "--json", "", "Emit machine-readable JSON", true)
+    ], [
+        microCommand("new", "Create a conventional Micro project", [microArg("directory", "Destination directory")]),
+        microCommand("pull", "Restore a deployed Micro source snapshot", [microArg("slug", "Project slug"), microArg("directory", "Destination directory", false)]),
+        microCommand("gallery", "List curated Micros"),
+        microCommand("remix", "Copy a curated Micro for local editing", [microArg("entry", "Gallery entry"), microArg("directory", "Destination directory", false)]),
+        microCommand("build", "Build and validate the current Micro"),
+        microCommand("dev", "Run the current Micro locally", [], [microOpt("port", "--port", "PORT", "Local port")]),
+        microCommand("signup", "Create a Micro account securely", [], [microOpt("email", "--email", "EMAIL", "Account email", true), microFlag("password-stdin", "--password-stdin", "Read the password from standard input")]),
+        microCommand("login", "Pair this CLI with a Micro account"),
+        microCommand("logout", "Revoke the CLI session and remove local credentials"),
+        microCommand("account", "Manage the current account", [], [], [
+            microCommand("status", "Inspect email verification and account state", [], [microFlag("wait", "--wait", "Wait for verification")])
+        ]),
+        microCommand("plans", "List hosting plans"),
+        microCommand("platform", "Inspect the Micro platform", [], [], [microCommand("status", "Show platform and component status")]),
+        microCommand("usage", "Inspect account usage"),
+        microCommand("spending-cap", "Manage the account spending cap", [], [], [
+            microCommand("set", "Set a monthly spending cap", [], [microOpt("monthly-cents", "--monthly-cents", "CENTS", "Monthly cap in cents", true), microOpt("warning-percent", "--warning-percent", "PERCENT", "Warning threshold", true), microFlag("soft", "--soft", "Warn without a hard stop")]),
+            microCommand("delete", "Remove the spending cap", [], [microFlag("confirm", "--confirm", "Confirm removal")])
+        ]),
+        microCommand("billing", "Inspect the hosting subscription", [], [], [
+            microCommand("checkout", "Start a prorated plan change", [microArg("plan", "Plan identifier")]),
+            microCommand("portal", "Open the Stripe billing portal")
+        ]),
+        microCommand("deploy", "Deploy the current Micro", [microArg("slug", "Production slug", false)], [microFlag("preview", "--preview", "Create an expiring preview"), microFlag("github", "--github", "Use GitHub deployment authorization"), microFlag("accept-price-changes", "--accept-price-changes", "Accept product price changes"), microFlag("accept-live-products", "--accept-live-products", "Accept live products")]),
+        microCommand("github", "Manage GitHub deployment bindings", [], [], [
+            microCommand("link", "Create a deployment binding", [], [microOpt("repository", "--repository", "OWNER/REPO", "Repository", true), microOpt("environment", "--environment", "NAME", "GitHub environment", true), microOpt("ref", "--ref", "REF", "Protected ref", true), microOpt("slug", "--slug", "SLUG", "Micro slug", true)]),
+            microCommand("bindings", "List deployment bindings"),
+            microCommand("revoke", "Revoke a deployment binding", [microArg("binding-id", "Binding UUID")])
+        ]),
+        microCommand("projects", "List accessible Micros"),
+        microCommand("project", "Manage the linked Micro", [], [], [
+            microCommand("deletions", "List project deletion receipts"),
+            microCommand("delete", "Delete the linked Micro", [], [microOpt("confirm-slug", "--confirm-slug", "SLUG", "Exact linked slug", true), microFlag("confirm", "--confirm", "Confirm deletion")])
+        ]),
+        microCommand("status", "Inspect the linked Micro"),
+        microCommand("settings", "Inspect project settings", [], [], [
+            microCommand("visibility", "Change project visibility", [microArg("visibility", "public or private")], [microFlag("confirm", "--confirm", "Confirm the change")])
+        ]),
+        microCommand("members", "List project members", [], [], [
+            microCommand("set", "Add or update a project member", [microArg("email", "Member email"), microArg("role", "viewer, developer, or admin")], [microFlag("can-promote", "--can-promote", "Allow admin promotion")]),
+            microCommand("remove", "Remove a project member", [microArg("account-id", "Account UUID")], [microFlag("confirm", "--confirm", "Confirm removal")])
+        ]),
+        microCommand("invitations", "List project invitations", [], [], [
+            microCommand("create", "Invite a project member", [microArg("email", "Invitee email"), microArg("role", "viewer, developer, or admin")], [microFlag("can-promote", "--can-promote", "Allow admin promotion")]),
+            microCommand("revoke", "Revoke an invitation", [microArg("invitation-id", "Invitation UUID")], [microFlag("confirm", "--confirm", "Confirm revocation")]),
+            microCommand("accept", "Accept an invitation", [], [microFlag("token-stdin", "--token-stdin", "Read the invitation token from standard input")])
+        ]),
+        microCommand("domains", "List custom domains", [], [], [
+            microCommand("add", "Add a custom domain", [microArg("hostname", "Domain hostname")]),
+            microCommand("verify", "Verify custom-domain DNS", [microArg("domain-id", "Domain UUID")]),
+            microCommand("remove", "Remove a custom domain", [microArg("domain-id", "Domain UUID")], [microFlag("confirm", "--confirm", "Confirm removal")])
+        ]),
+        microCommand("private-grants", "List private-site grants", [], [], [
+            microCommand("create", "Create a private-site grant", [], [microOpt("expires-days", "--expires-days", "DAYS", "Grant lifetime", true), microOpt("label", "--label", "LABEL", "Grant label", true)]),
+            microCommand("revoke", "Revoke a private-site grant", [microArg("grant-id", "Grant UUID")], [microFlag("confirm", "--confirm", "Confirm revocation")])
+        ]),
+        microCommand("schedules", "List scheduled invocations", [], [], [
+            microCommand("set", "Create or update a schedule", [microArg("id", "Schedule identifier")], [microOpt("every-minutes", "--every-minutes", "MINUTES", "Invocation interval", true), microOpt("payload-file", "--payload-file", "FILE", "JSON payload file"), microFlag("disabled", "--disabled", "Create the schedule disabled")]),
+            microCommand("run", "Run a schedule now", [microArg("id", "Schedule identifier")], [microFlag("confirm", "--confirm", "Confirm invocation")]),
+            microCommand("remove", "Remove a schedule", [microArg("id", "Schedule identifier")], [microFlag("confirm", "--confirm", "Confirm removal")])
+        ]),
+        microCommand("emails", "Inspect transactional email activity"),
+        microCommand("deployments", "List project deployments"),
+        microCommand("logs", "Read project logs", [], [microOpt("since", "--since", "DURATION", "Log window", false)]),
+        microCommand("users", "List application users", [], [], [
+            microCommand("disable", "Disable an application user", [microArg("user-id", "Application-user UUID")], [microFlag("confirm", "--confirm", "Confirm disablement")]),
+            microCommand("enable", "Enable an application user", [microArg("user-id", "Application-user UUID")]),
+            microCommand("revoke-sessions", "Revoke an application user's sessions", [microArg("user-id", "Application-user UUID")], [microFlag("confirm", "--confirm", "Confirm revocation")])
+        ]),
+        microCommand("records", "Inspect database records", [], [], [
+            microCommand("delete", "Delete one exact record version", [microArg("environment", "preview or production"), microArg("collection", "Collection"), microArg("scope", "Record scope"), microArg("key", "Record key")], [microOpt("version", "--version", "VERSION", "Exact record version", true), microFlag("confirm", "--confirm", "Confirm deletion")])
+        ]),
+        microCommand("backups", "List record backups", [], [], [
+            microCommand("create", "Create a record backup", [], [microFlag("confirm", "--confirm", "Confirm backup creation")]),
+            microCommand("restore", "Restore a record backup", [microArg("backup-id", "Backup UUID")], [microOpt("backup-sha256", "--backup-sha256", "SHA", "Backup digest", true), microOpt("expected-current-sha256", "--expected-current-sha256", "SHA", "Current-record digest", true), microFlag("confirm", "--confirm", "Confirm restoration")]),
+            microCommand("delete", "Delete a record backup", [microArg("backup-id", "Backup UUID")], [microOpt("sha256", "--sha256", "SHA", "Backup digest", true), microFlag("confirm", "--confirm", "Confirm deletion")])
+        ]),
+        microCommand("purchases", "Inspect purchases"),
+        microCommand("audit", "Read the project audit log"),
+        microCommand("export", "Export project data", [microArg("resource", "Optional resource name", false)], [microOpt("limit", "--limit", "COUNT", "Page size"), microOpt("offset", "--offset", "COUNT", "Page offset")]),
+        microCommand("retention", "Inspect record retention", [], [], [
+            microCommand("set", "Set record retention", [], [microOpt("record-days", "--record-days", "DAYS", "Retention period", true), microFlag("automatic", "--automatic", "Enable automatic pruning"), microFlag("confirm", "--confirm", "Confirm policy change")]),
+            microCommand("prune", "Prune eligible records", [], [microOpt("expected-records", "--expected-records", "COUNT", "Expected deletion count", true), microFlag("confirm", "--confirm", "Confirm pruning")])
+        ]),
+        microCommand("rollback", "Activate an earlier deployment", [microArg("deployment", "Deployment UUID")]),
+        microCommand("products", "List products", [], [], [microCommand("sync", "Synchronize products without deleting remote products", [], [microFlag("accept-price-changes", "--accept-price-changes", "Accept price changes"), microFlag("accept-live-products", "--accept-live-products", "Accept live products")])]),
+        microCommand("files", "List project files", [], [], [
+            microCommand("upload", "Upload a protected or public file", [microArg("id", "Stable file identifier"), microArg("path", "Local file path")], [microOpt("entitlement", "--entitlement", "ID", "Required entitlement"), microFlag("public", "--public", "Make the object public")])
+        ]),
+        microCommand("open", "Open the linked Micro in a browser")
+    ]
+)
+
+fun microUsage(): string = microCli().help([])

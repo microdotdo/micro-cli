@@ -1,8 +1,8 @@
 import "core.ab"
 import "project.ab"
+import "commands.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.7.4\n\nBuild, deploy, and operate small full-stack sites on micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] gallery [--json]\n  micro [--api URL] remix <entry> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] plans [--json]\n  micro [--api URL] platform status [--json]\n  micro [--api URL] usage [--json]\n  micro [--api URL] spending-cap set --monthly-cents CENTS --warning-percent PERCENT [--soft] [--json]\n  micro [--api URL] spending-cap delete --confirm [--json]\n  micro [--api URL] billing [--json]\n  micro [--api URL] billing checkout <plan> [--json]\n  micro [--api URL] billing portal [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] project deletions [--json]\n  micro [--api URL] project delete --confirm-slug SLUG --confirm [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] settings [--json]\n  micro [--api URL] settings visibility <public|private> --confirm [--json]\n  micro [--api URL] members [--json]\n  micro [--api URL] members set <email> <viewer|developer|admin> [--can-promote] [--json]\n  micro [--api URL] members remove <account-id> --confirm [--json]\n  micro [--api URL] invitations [--json]\n  micro [--api URL] invitations create <email> <viewer|developer|admin> [--can-promote] [--json]\n  micro [--api URL] invitations revoke <invitation-id> --confirm [--json]\n  micro [--api URL] invitations accept --token-stdin [--json]\n  micro [--api URL] domains [--json]\n  micro [--api URL] domains add <hostname> [--json]\n  micro [--api URL] domains verify <domain-id> [--json]\n  micro [--api URL] domains remove <domain-id> --confirm [--json]\n  micro [--api URL] private-grants [--json]\n  micro [--api URL] private-grants create --expires-days DAYS --label LABEL [--json]\n  micro [--api URL] private-grants revoke <grant-id> --confirm [--json]\n  micro [--api URL] schedules [--json]\n  micro [--api URL] schedules set <id> --every-minutes MINUTES [--payload-file FILE] [--disabled] [--json]\n  micro [--api URL] schedules run <id> --confirm [--json]\n  micro [--api URL] schedules remove <id> --confirm [--json]\n  micro [--api URL] emails [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] backups [--json]\n  micro [--api URL] backups create --confirm [--json]\n  micro [--api URL] backups restore <backup-id> --backup-sha256 SHA --expected-current-sha256 SHA --confirm [--json]\n  micro [--api URL] backups delete <backup-id> --sha256 SHA --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -1407,6 +1407,11 @@ fun microOpenProject(): MicroResult {
 class MicroCommandResult(val result: MicroResult, val json: bool)
 
 fun microRun(): MicroCommandResult {
+    val schema = microCli().parseProcess()
+    if (schema.succeeded && (schema.kind == "help" || schema.kind == "version"))
+        return MicroCommandResult(MicroResult(true, schema.message), schema.has("json"))
+    if (!schema.succeeded)
+        return MicroCommandResult(MicroResult(false, schema.message), schema.has("json"))
     var count = linuxArgumentCount()
     val jsonOutput = count > 0 && linuxArgument(count - 1) == "--json"
     if (jsonOutput) count = count - 1
@@ -1422,7 +1427,7 @@ fun microRun(): MicroCommandResult {
     if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
         return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
     if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.7.4"), jsonOutput)
+        return MicroCommandResult(MicroResult(true, "micro 0.8.0"), jsonOutput)
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
     val command = linuxArgument(index)

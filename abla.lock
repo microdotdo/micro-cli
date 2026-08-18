@@ -1,0 +1,12 @@
+version = 2
+
+[[package]]
+name = "abla-cli"
+provider = "git"
+identity = "github:AndreBaltazar8/abla-cli"
+source = "https://github.com/AndreBaltazar8/abla-cli.git"
+selector-kind = "head"
+selector = "HEAD"
+revision = "6434dc8843fce88bcf9263097785dc46ab751e88"
+digest = "3e9d34f753eba1da376b186583e3beeb6326921b"
+entry = "src/cli.ab"
