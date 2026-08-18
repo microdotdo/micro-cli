@@ -1,4 +1,11 @@
-import github("AndreBaltazar8/abla-cli")
+compile fun microAblaCliSource(): ImportSource = gitImportSource(
+    "abla-cli",
+    "https://github.com/AndreBaltazar8/abla-cli.git",
+    "tag",
+    "v0.1.2"
+)
+
+import microAblaCliSource()
 
 fun microArg(name: string, description: string, required: bool = true): CliArgument =
     cliArgument(name, description, required)
