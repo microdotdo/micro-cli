@@ -7,8 +7,8 @@
 Linux x86-64 releases include a checksum alongside the executable:
 
 ```sh
-curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/latest/download/micro-linux-x86_64
-curl -LO https://github.com/AndreBaltazar8/micro-cli/releases/latest/download/micro-linux-x86_64.sha256
+curl -LO https://github.com/microdotdo/micro-cli/releases/latest/download/micro-linux-x86_64
+curl -LO https://github.com/microdotdo/micro-cli/releases/latest/download/micro-linux-x86_64.sha256
 sha256sum --check micro-linux-x86_64.sha256
 install -Dm755 micro-linux-x86_64 "$HOME/.local/bin/micro"
 micro login
