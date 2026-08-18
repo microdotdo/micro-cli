@@ -1431,7 +1431,7 @@ fun microRun(): MicroCommandResult {
     if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
         return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
     if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.8.1"), jsonOutput)
+        return MicroCommandResult(MicroResult(true, "micro 0.8.2"), jsonOutput)
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
     val command = linuxArgument(index)

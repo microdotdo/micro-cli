@@ -1,9 +1,12 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to publish
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -12,9 +15,12 @@ jobs:
   release:
     runs-on: ubuntu-24.04
     env:
-      ABLAC_COMMIT: 946d112a649c4f4fc6f4e156251c10c2d2095985
+      ABLAC_COMMIT: 217d7801d22adbcd381e1aeba4c0942108f21935
+      RELEASE_TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag }}
       - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
       - name: Build public Abla compiler revision
         run: |
@@ -32,16 +38,16 @@ jobs:
           sudo apt-get install -y --no-install-recommends clang lld libssl-dev
           clang -fuse-ld=lld build/micro.o -lssl -lcrypto -lpthread -o build/micro-linux-x86_64
           strip build/micro-linux-x86_64
-          test "$(build/micro-linux-x86_64 --version)" = "micro ${GITHUB_REF_NAME#v}"
+          test "$(build/micro-linux-x86_64 --version)" = "micro ${RELEASE_TAG#v}"
           cd build
           sha256sum micro-linux-x86_64 > micro-linux-x86_64.sha256
       - name: Publish immutable release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-
-          gh release create "$GITHUB_REF_NAME"
+          gh release create "$RELEASE_TAG"
           build/micro-linux-x86_64
           build/micro-linux-x86_64.sha256
           --verify-tag
-          --title "micro ${GITHUB_REF_NAME#v}"
+          --title "micro ${RELEASE_TAG#v}"
           --generate-notes

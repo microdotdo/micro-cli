@@ -10,7 +10,8 @@ are generated from the same typed schema used to validate invocations; run
 
 ## Install
 
-Linux x86-64 releases include a checksum alongside the executable:
+Linux x86-64 and macOS releases include a checksum alongside each executable.
+For Linux:
 
 ```sh
 curl -LO https://github.com/microdotdo/micro-cli/releases/latest/download/micro-linux-x86_64
@@ -19,6 +20,11 @@ sha256sum --check micro-linux-x86_64.sha256
 install -Dm755 micro-linux-x86_64 "$HOME/.local/bin/micro"
 micro login
 ```
+
+On Apple Silicon, replace the two asset names above with
+`micro-macos-arm64`; on an Intel Mac, use `micro-macos-x86_64`. Verify with
+`shasum -a 256 --check <asset>.sha256`, then install the executable as
+`$HOME/.local/bin/micro`.
 
 To install from source instead, install the
 [Abla compiler](https://github.com/AndreBaltazar8/ablac), then:
@@ -171,6 +177,9 @@ GitHub.
 ```sh
 make test build
 ```
+
+From Linux, `ABLA_MACOS_SDK=/path/to/MacOSX.sdk make macos` builds both Intel
+and Apple Silicon executables through Abla's LLVM/LLD cross path.
 
 On systems where locally built Abla executables use an OpenSSL library outside
 the default loader path, pass its directory with
