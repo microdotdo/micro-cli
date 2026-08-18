@@ -45,6 +45,10 @@ micro signup --email you@example.com
 micro deploy my-site
 micro status
 micro logs --since 30m
+micro users
+micro users disable 11111111-1111-4111-8111-111111111111 --confirm
+micro users enable 11111111-1111-4111-8111-111111111111
+micro users revoke-sessions 11111111-1111-4111-8111-111111111111 --confirm
 micro pull my-site another-checkout
 ```
 
@@ -52,7 +56,10 @@ The first successful deployment atomically claims an available slug. Subsequent
 deployments use the stored source revision and reject stale updates instead of
 silently overwriting another checkout. Optional `micro.yaml` products are
 synchronized non-destructively; protected files are uploaded explicitly with
-`micro files upload`.
+`micro files upload`. App-user disablement preserves their records, purchases,
+and entitlements while immediately revoking active sessions, recovery links,
+verification links, and private download grants. Session revocation can be used
+separately without disabling the user.
 
 ## GitHub Actions
 

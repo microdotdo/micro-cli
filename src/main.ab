@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -72,6 +72,38 @@ fun microSyncProducts(
 fun microFiles(api: MicroApi): MicroResult = microLinkedRequest(api, "/files")
 
 fun microUsers(api: MicroApi): MicroResult = microLinkedRequest(api, "/users?limit=100")
+
+fun microManageUser(api: MicroApi, userId: string, operation: string): MicroResult {
+    if (!microUuidValid(userId)) return MicroResult(false, "App user ID must be a UUID.")
+    val changed = microLinkedRequest(api, "/users/$userId/$operation", "POST")
+    if (!changed.succeeded) return changed
+    val parsed = jsonParse(changed.structured)
+    if (!parsed.succeeded || !parsed.value.isObject())
+        return MicroResult(false, "micro.do returned an invalid app-user response.")
+    val email = parsed.value.getString("email")
+    val sessions = parsed.value.getInt("sessions_revoked")
+    val transfers = parsed.value.getInt("transfers_revoked")
+    val message = if (operation == "disable")
+        "Disabled $email; revoked $sessions sessions and $transfers private download grants."
+    else if (operation == "enable") "Enabled $email."
+    else "Revoked $sessions sessions and $transfers private download grants for $email."
+    MicroResult(true, message, changed.structured)
+}
+
+fun microDisableUser(api: MicroApi, userId: string, confirmed: bool): MicroResult {
+    if (!confirmed)
+        return MicroResult(false, "Disabling an app user requires --confirm.")
+    microManageUser(api, userId, "disable")
+}
+
+fun microEnableUser(api: MicroApi, userId: string): MicroResult =
+    microManageUser(api, userId, "enable")
+
+fun microRevokeUserSessions(api: MicroApi, userId: string, confirmed: bool): MicroResult {
+    if (!confirmed)
+        return MicroResult(false, "Revoking app-user sessions requires --confirm.")
+    microManageUser(api, userId, "revoke-sessions")
+}
 
 fun microRecords(api: MicroApi): MicroResult = microLinkedRequest(api, "/records?limit=100")
 
@@ -763,6 +795,23 @@ fun microRun(): MicroCommandResult {
         linuxArgument(index + 1) == "--since")
         microProjectLogs(api, linuxArgument(index + 2))
     else if (command == "users" && index + 1 == count) microUsers(api)
+    else if (command == "users" && index + 4 == count &&
+        linuxArgument(index + 1) == "disable" &&
+        linuxArgument(index + 3) == "--confirm")
+        microDisableUser(api, linuxArgument(index + 2), true)
+    else if (command == "users" && index + 3 == count &&
+        linuxArgument(index + 1) == "disable")
+        microDisableUser(api, linuxArgument(index + 2), false)
+    else if (command == "users" && index + 3 == count &&
+        linuxArgument(index + 1) == "enable")
+        microEnableUser(api, linuxArgument(index + 2))
+    else if (command == "users" && index + 4 == count &&
+        linuxArgument(index + 1) == "revoke-sessions" &&
+        linuxArgument(index + 3) == "--confirm")
+        microRevokeUserSessions(api, linuxArgument(index + 2), true)
+    else if (command == "users" && index + 3 == count &&
+        linuxArgument(index + 1) == "revoke-sessions")
+        microRevokeUserSessions(api, linuxArgument(index + 2), false)
     else if (command == "records" && index + 1 == count) microRecords(api)
     else if (command == "purchases" && index + 1 == count) microPurchases(api)
     else if (command == "audit" && index + 1 == count) microAudit(api)

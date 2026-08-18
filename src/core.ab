@@ -114,6 +114,21 @@ fun microParsePort(value: string, fallback: int): int {
     if (valid && parsed > 0 && parsed <= 65535) parsed else fallback
 }
 
+fun microUuidValid(value: string): bool {
+    if (value.size != 36) return false
+    var valid = true
+    var index = 0
+    while (valid && index < value.size) {
+        val byte = value[index]
+        val hyphen = index == 8 || index == 13 || index == 18 || index == 23
+        val hex = (byte >= 48 && byte <= 57) || (byte >= 65 && byte <= 70) ||
+            (byte >= 97 && byte <= 102)
+        valid = if (hyphen) byte == 45 else hex
+        index = index + 1
+    }
+    valid
+}
+
 fun microParseApi(value: string): MicroApi {
     var origin = value
     while (origin.size > 0 && origin[origin.size - 1] == 47)
