@@ -129,6 +129,37 @@ fun microUuidValid(value: string): bool {
     valid
 }
 
+fun microPositiveInt(value: string, fallback: int, maximum: int = 2147483647): int {
+    var parsed = 0
+    var valid = value.size > 0
+    var index = 0
+    while (valid && index < value.size) {
+        val digit = value[index] - 48
+        if (digit < 0 || digit > 9 || parsed > (maximum - digit) / 10) valid = false
+        else parsed = parsed * 10 + digit
+        index = index + 1
+    }
+    if (valid && parsed > 0 && parsed <= maximum) parsed else fallback
+}
+
+fun microDataNameValid(value: string, maximum: int): bool {
+    var valid = value.size >= 1 && value.size <= maximum
+    var index = 0
+    while (valid && index < value.size) {
+        val byte = value[index]
+        valid = (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) ||
+            byte == 45 || byte == 95 || byte == 46
+        index = index + 1
+    }
+    valid
+}
+
+fun microRecordScopeValid(value: string): bool {
+    if (value == "project") return true
+    if (value.size != 41 || value.slice(0, 5) != "user:") return false
+    microUuidValid(value.slice(5, value.size))
+}
+
 fun microParseApi(value: string): MicroApi {
     var origin = value
     while (origin.size > 0 && origin[origin.size - 1] == 47)
