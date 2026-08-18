@@ -129,6 +129,18 @@ fun microUuidValid(value: string): bool {
     valid
 }
 
+fun microSha256Valid(value: string): bool {
+    if (value.size != 64) return false
+    var valid = true
+    var index = 0
+    while (valid && index < value.size) {
+        val byte = value[index]
+        valid = (byte >= 48 && byte <= 57) || (byte >= 97 && byte <= 102)
+        index = index + 1
+    }
+    valid
+}
+
 fun microPositiveInt(value: string, fallback: int, maximum: int = 2147483647): int {
     var parsed = 0
     var valid = value.size > 0

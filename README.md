@@ -56,6 +56,10 @@ micro export records --limit 100 --offset 0 --json
 micro retention
 micro retention set --record-days 90 --automatic --confirm
 micro retention prune --expected-records 12 --confirm
+micro backups
+micro backups create --confirm
+micro backups restore BACKUP_ID --backup-sha256 BACKUP_SHA --expected-current-sha256 CURRENT_SHA --confirm
+micro backups delete BACKUP_ID --sha256 BACKUP_SHA --confirm
 micro project deletions
 micro project delete --confirm-slug my-site --confirm
 micro pull my-site another-checkout
@@ -73,6 +77,10 @@ Retention defaults to keeping project records forever. A finite 30–3650 day
 policy can be manual or automatic, but it never prunes purchases or
 entitlements. Manual pruning requires the current preview count and
 `--confirm`, so a changed preview fails instead of deleting a different set.
+Record backups are transactional, bounded snapshots of project records. A
+restore replaces the current record set only after both the selected backup
+digest and freshly inspected current-record digest match. It never rewinds app
+users, purchases, entitlements, products, files, deployments, or local source.
 Project deletion is linked to the exact project ID in `.micro/project.json` and
 requires both the typed slug and `--confirm`. The project disappears from the
 runner immediately, its slug remains reserved for 30 days, and protected-object

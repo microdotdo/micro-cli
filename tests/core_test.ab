@@ -47,5 +47,11 @@ fun main: int {
     else if (microProjectDeletionConfirmationValid(
         "not-a-uuid", "linked-site", "linked-site", true
     )) 20
+    else if (!microSha256Valid(
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    )) 21
+    else if (microSha256Valid(
+        "0123456789ABCDEF0123456789abcdef0123456789abcdef0123456789abcdef"
+    ) || microSha256Valid("0123")) 22
     else 0
 }
