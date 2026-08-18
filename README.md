@@ -51,6 +51,8 @@ micro users enable 11111111-1111-4111-8111-111111111111
 micro users revoke-sessions 11111111-1111-4111-8111-111111111111 --confirm
 micro records
 micro records delete production notes project welcome --version 3 --confirm
+micro export
+micro export records --limit 100 --offset 0 --json
 micro pull my-site another-checkout
 ```
 

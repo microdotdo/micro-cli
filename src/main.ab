@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -145,6 +145,26 @@ fun microDeleteRecord(
 fun microPurchases(api: MicroApi): MicroResult = microLinkedRequest(api, "/purchases?limit=100")
 
 fun microAudit(api: MicroApi): MicroResult = microLinkedRequest(api, "/audit?limit=100")
+
+fun microExportResourceValid(value: string): bool =
+    value == "users" || value == "records" || value == "purchases" ||
+    value == "entitlements" || value == "products" || value == "files" ||
+    value == "audit"
+
+fun microExport(
+    api: MicroApi,
+    resourceName: string = "",
+    limit: int = 100,
+    offset: int = 0
+): MicroResult {
+    if (resourceName != "" && !microExportResourceValid(resourceName))
+        return MicroResult(false, "Export resource must be users, records, purchases, entitlements, products, files, or audit.")
+    if (limit < 1 || limit > 100 || offset < 0 || offset > 100000)
+        return MicroResult(false, "Export pages require a limit from 1 through 100 and an offset from 0 through 100000.")
+    val endpoint = if (resourceName == "") "/export"
+        else "/export/$resourceName?limit=$limit&offset=$offset"
+    microLinkedRequest(api, endpoint)
+}
 
 fun microUploadFile(
     api: MicroApi,
@@ -867,6 +887,17 @@ fun microRun(): MicroCommandResult {
         )
     else if (command == "purchases" && index + 1 == count) microPurchases(api)
     else if (command == "audit" && index + 1 == count) microAudit(api)
+    else if (command == "export" && index + 1 == count) microExport(api)
+    else if (command == "export" && index + 2 == count)
+        microExport(api, linuxArgument(index + 1))
+    else if (command == "export" && index + 6 == count &&
+        linuxArgument(index + 2) == "--limit" &&
+        linuxArgument(index + 4) == "--offset")
+        microExport(
+            api, linuxArgument(index + 1),
+            microPositiveInt(linuxArgument(index + 3), -1, 100),
+            microNonNegativeInt(linuxArgument(index + 5), -1, 100000)
+        )
     else if (command == "rollback" && index + 2 == count)
         microProjectRollback(api, linuxArgument(index + 1))
     else if (command == "products" && index + 1 == count) microProducts(api)
