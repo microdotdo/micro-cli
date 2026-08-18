@@ -164,6 +164,11 @@ The first-party Action obtains a GitHub OIDC identity and invokes
 make test build
 ```
 
+On systems where locally built Abla executables use an OpenSSL library outside
+the default loader path, pass its directory with
+`ABLA_TEST_LD_LIBRARY_PATH=/path/to/openssl/lib make test`. This affects only
+the test process and is never embedded in the released CLI.
+
 Set `MICRO_API=http://127.0.0.1:8080` to work against a local control plane.
 Plain HTTP is rejected for non-loopback API addresses.
 
