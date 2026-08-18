@@ -10,20 +10,41 @@ fun contains(value: string, expected: string): bool {
     found
 }
 
+fun validateHelp(app: CliApp, commands: array<CliCommand>, prefix: array<string>): int {
+    var total = 0
+    var index = 0
+    while (index < commands.size) {
+        val command = commands[index]
+        val path: array<string> = []
+        var part = 0
+        while (part < prefix.size) { path.append(prefix[part]); part = part + 1 }
+        path.append(command.name)
+        val help = app.help(path)
+        if (command.name == "" || command.description == "" || !contains(help, "Usage:"))
+            return -1
+        val children = validateHelp(app, command.commands, path)
+        if (children < 0) return children
+        total = total + 1 + children
+        index = index + 1
+    }
+    total
+}
+
 fun main: int {
     val app = microCli()
     val deploy = app.parse(["deploy", "--help"])
     val restore = app.parse(["backups", "restore", "--help"])
     val upload = app.parse(["files", "upload", "--help"])
     val valid = app.parse(["files", "upload", "asset", "archive.zip", "--entitlement", "downloads", "--json"])
-    if (!deploy.succeeded || !contains(deploy.message, "--accept-live-products")) 1
+    if (validateHelp(app, app.commands, []) != 76) 1
+    else if (!deploy.succeeded || !contains(deploy.message, "--accept-live-products")) 2
     else if (!restore.succeeded || !contains(restore.message, "<backup-id>") ||
-        !contains(restore.message, "--expected-current-sha256")) 2
-    else if (!upload.succeeded || !contains(upload.message, "<id> <path>")) 3
-    else if (!valid.succeeded || !valid.isCommand("files upload")) 4
-    else if (valid.argument(0) != "asset" || valid.value("entitlement") != "downloads") 5
-    else if (!valid.has("json")) 6
-    else if (app.parse(["files", "upload", "asset"]).succeeded) 7
-    else if (app.parse(["backups", "restore", "id", "--backup-sha256", "a"]).succeeded) 8
+        !contains(restore.message, "--expected-current-sha256")) 3
+    else if (!upload.succeeded || !contains(upload.message, "<id> <path>")) 4
+    else if (!valid.succeeded || !valid.isCommand("files upload")) 5
+    else if (valid.argument(0) != "asset" || valid.value("entitlement") != "downloads") 6
+    else if (!valid.has("json")) 7
+    else if (app.parse(["files", "upload", "asset"]).succeeded) 8
+    else if (app.parse(["backups", "restore", "id", "--backup-sha256", "a"]).succeeded) 9
     else 0
 }
