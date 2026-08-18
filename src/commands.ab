@@ -19,7 +19,7 @@ fun microCommand(name: string, description: string,
     cliCommand(name, description, [], options, arguments, commands)
 
 fun microCli(): CliApp = cliApplication(
-    "micro", "0.8.0", "Build, deploy, and operate small full-stack sites on micro.do",
+    "micro", "0.8.1", "Build, deploy, and operate small full-stack sites on micro.do",
     [
         cliOption("api", "--api", "", "URL", "micro.do API base URL", false, true, "https://micro.do"),
         cliFlag("json", "--json", "", "Emit machine-readable JSON", true)
@@ -47,7 +47,7 @@ fun microCli(): CliApp = cliApplication(
             microCommand("checkout", "Start a prorated plan change", [microArg("plan", "Plan identifier")]),
             microCommand("portal", "Open the Stripe billing portal")
         ]),
-        microCommand("deploy", "Deploy the current Micro", [microArg("slug", "Production slug", false)], [microFlag("preview", "--preview", "Create an expiring preview"), microFlag("github", "--github", "Use GitHub deployment authorization"), microFlag("accept-price-changes", "--accept-price-changes", "Accept product price changes"), microFlag("accept-live-products", "--accept-live-products", "Accept live products")]),
+        microCommand("deploy", "Deploy the current Micro", [microArg("slug", "Production slug", false)], [microFlag("preview", "--preview", "Create an expiring preview"), microFlag("github", "--github", "Use GitHub deployment authorization"), microFlag("prebuilt", "--prebuilt", "Deploy the bundle built before requesting GitHub authority"), microFlag("accept-price-changes", "--accept-price-changes", "Accept product price changes"), microFlag("accept-live-products", "--accept-live-products", "Accept live products")]),
         microCommand("github", "Manage GitHub deployment bindings", [], [], [
             microCommand("link", "Create a deployment binding", [], [microOpt("repository", "--repository", "OWNER/REPO", "Repository", true), microOpt("environment", "--environment", "NAME", "GitHub environment", true), microOpt("ref", "--ref", "REF", "Protected ref", true), microOpt("slug", "--slug", "SLUG", "Micro slug", true)]),
             microCommand("bindings", "List deployment bindings"),

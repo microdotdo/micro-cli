@@ -161,8 +161,10 @@ Commit the generated `micro.github.json`. It contains a public binding ID and
 policy facts, never a credential; the Action uses it to select the exact
 owner-approved binding without accepting a target slug from workflow input.
 
-The first-party Action obtains a GitHub OIDC identity and invokes
-`micro deploy --github`. No long-lived Micro token is stored in GitHub.
+The first-party Action runs `micro build` before requesting GitHub OIDC, then
+invokes `micro deploy --github --prebuilt` so project compilation never receives
+the short-lived deployment authority. No long-lived Micro token is stored in
+GitHub.
 
 ## Development
 

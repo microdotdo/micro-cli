@@ -710,9 +710,13 @@ fun microGithubAuthorization(api: MicroApi): MicroGithubAuthorization {
     )
 }
 
-fun microDeployGithub(api: MicroApi): MicroResult {
-    val built = microBuildProject(path("."))
-    if (!built.succeeded) return built
+fun microDeployGithub(api: MicroApi, prebuilt: bool = false): MicroResult {
+    if (!prebuilt) {
+        val built = microBuildProject(path("."))
+        if (!built.succeeded) return built
+    } else if (path(".micro/bundle.json").readText() == "") {
+        return MicroResult(false, "The prebuilt bundle is missing; run `micro build` before requesting GitHub deployment authority.")
+    }
     val authorization = microGithubAuthorization(api)
     if (!authorization.valid) return MicroResult(false, authorization.message)
     val priceChanges = linuxEnvironment("MICRO_ACCEPT_PRICE_CHANGES")
@@ -1427,7 +1431,7 @@ fun microRun(): MicroCommandResult {
     if (index >= count || linuxArgument(index) == "--help" || linuxArgument(index) == "-h")
         return MicroCommandResult(MicroResult(true, microUsage()), jsonOutput)
     if (linuxArgument(index) == "--version" || linuxArgument(index) == "-V")
-        return MicroCommandResult(MicroResult(true, "micro 0.8.0"), jsonOutput)
+        return MicroCommandResult(MicroResult(true, "micro 0.8.1"), jsonOutput)
     val api = microParseApi(apiValue)
     if (!api.valid) return MicroCommandResult(MicroResult(false, api.message), jsonOutput)
     val command = linuxArgument(index)
@@ -1516,6 +1520,10 @@ fun microRun(): MicroCommandResult {
     else if (command == "deploy" && index + 2 == count &&
         linuxArgument(index + 1) == "--github")
         microDeployGithub(api)
+    else if (command == "deploy" && index + 3 == count &&
+        linuxArgument(index + 1) == "--github" &&
+        linuxArgument(index + 2) == "--prebuilt")
+        microDeployGithub(api, true)
     else if (command == "deploy" && index + 2 == count)
         microDeploySite(api, linuxArgument(index + 1), false)
     else if (command == "deploy" && index + 3 == count &&
