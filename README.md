@@ -38,6 +38,25 @@ purchase events are disposable in-memory fixtures. Override the runner binary
 with `MICRO_RUNNER` and the compiler with `MICRO_ABLAC` when developing those
 repositories together.
 
+To start from a reviewed site instead of an empty project:
+
+```sh
+micro gallery
+micro remix digital-product my-shop
+cd my-shop
+micro dev
+```
+
+Remix is public and local-only. It restores an immutable source snapshot and
+records its creator, license, source digest, and copy policy in
+`.micro/remix.json`; it does not create a project, reserve a slug, or link the
+new directory to the original project. Only source, public assets, and product
+definitions in `micro.yaml` are copied. Users, records, purchases,
+entitlements, stored files, domains, team members, schedules, email history,
+secrets, and provider connections remain behind.
+The source project's optional `micro.yaml` `slug:` field is removed so every
+remix must choose its own slug explicitly.
+
 ## Deploy and maintain
 
 ```sh

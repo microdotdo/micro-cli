@@ -60,6 +60,12 @@ fun main: int {
         microSchedulePayloadValid("[]") || microSchedulePayloadValid("not-json")) 24
     else if (!microScheduleIdValid("daily.digest_2") ||
         microScheduleIdValid("Daily") || microScheduleIdValid("-daily")) 25
+    else if (!microGalleryEntryIdValid("digital-product") ||
+        microGalleryEntryIdValid("Bad-entry") ||
+        microGalleryEntryIdValid("-entry") ||
+        microGalleryEntryIdValid("entry-")) 29
+    else if (microWithoutRemixSlug("slug: old-site\n\nproducts:\n  - id: pack\n") !=
+        "\nproducts:\n  - id: pack\n") 30
     else if (!microStringLess("app.ab", "micro.yaml") ||
         microStringLess("styles.css", "index.html") ||
         microStringLess("same", "same")) 26

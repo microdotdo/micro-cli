@@ -257,6 +257,49 @@ fun microPathSafe(value: string): bool {
     valid
 }
 
+fun microGalleryEntryIdValid(value: string): bool {
+    if (value.size < 3 || value.size > 64) return false
+    var valid = (value[0] >= 97 && value[0] <= 122) ||
+        (value[0] >= 48 && value[0] <= 57)
+    var index = 1
+    while (valid && index < value.size) {
+        val byte = value[index]
+        valid = (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57) ||
+            (byte == 45 && index + 1 < value.size)
+        index = index + 1
+    }
+    valid
+}
+
+fun microWithoutRemixSlug(contents: string): string {
+    var output = ""
+    var begin = 0
+    var cursor = 0
+    while (cursor <= contents.size) {
+        if (cursor == contents.size || contents[cursor] == 10) {
+            val line = contents.slice(begin, cursor)
+            val trimmed = microTrim(line)
+            var colon = 0
+            while (colon < trimmed.size && trimmed[colon] != 58) colon = colon + 1
+            val key = if (colon < trimmed.size) microTrim(trimmed.slice(0, colon)) else ""
+            if (key != "slug") {
+                output = "$output$line"
+                if (cursor < contents.size) output = "$output\n"
+            }
+            begin = cursor + 1
+        }
+        cursor = cursor + 1
+    }
+    output
+}
+
+fun microRemoveRemixSlug(root: Path): bool {
+    val configuration = root.child("micro.yaml")
+    if (!configuration.exists()) return true
+    val contents = configuration.readText()
+    configuration.writeTextAtomic(microWithoutRemixSlug(contents))
+}
+
 fun microMediaType(value: string): string {
     val extension = path(value).extension()
     if (extension == "html" || extension == "htm") "text/html; charset=utf-8"
