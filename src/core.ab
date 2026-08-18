@@ -173,6 +173,10 @@ fun microRecordScopeValid(value: string): bool {
     microUuidValid(value.slice(5, value.size))
 }
 
+fun microRetentionPolicyValid(recordDays: int, automatic: bool): bool =
+    (recordDays == 0 || (recordDays >= 30 && recordDays <= 3650)) &&
+    (!automatic || recordDays >= 30)
+
 fun microParseApi(value: string): MicroApi {
     var origin = value
     while (origin.size > 0 && origin[origin.size - 1] == 47)

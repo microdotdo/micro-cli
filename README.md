@@ -53,6 +53,9 @@ micro records
 micro records delete production notes project welcome --version 3 --confirm
 micro export
 micro export records --limit 100 --offset 0 --json
+micro retention
+micro retention set --record-days 90 --automatic --confirm
+micro retention prune --expected-records 12 --confirm
 micro pull my-site another-checkout
 ```
 
@@ -64,6 +67,10 @@ synchronized non-destructively; protected files are uploaded explicitly with
 and entitlements while immediately revoking active sessions, recovery links,
 verification links, and private download grants. Session revocation can be used
 separately without disabling the user.
+Retention defaults to keeping project records forever. A finite 30–3650 day
+policy can be manual or automatic, but it never prunes purchases or
+entitlements. Manual pruning requires the current preview count and
+`--confirm`, so a changed preview fails instead of deleting a different set.
 
 ## GitHub Actions
 

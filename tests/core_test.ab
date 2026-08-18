@@ -29,5 +29,11 @@ fun main: int {
     else if (microNonNegativeInt("0", -1, 100000) != 0 ||
         microNonNegativeInt("100000", -1, 100000) != 100000 ||
         microNonNegativeInt("100001", -1, 100000) != -1) 15
+    else if (!microRetentionPolicyValid(0, false) ||
+        !microRetentionPolicyValid(30, false) ||
+        !microRetentionPolicyValid(3650, true) ||
+        microRetentionPolicyValid(0, true) ||
+        microRetentionPolicyValid(29, false) ||
+        microRetentionPolicyValid(3651, false)) 16
     else 0
 }

@@ -2,7 +2,7 @@ import "core.ab"
 import "project.ab"
 import "abla/process/time"
 
-fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
+fun microUsage(): string = "micro 0.4.0\n\nBuild and deploy small full-stack sites to micro.do\n\nUsage:\n  micro [--api URL] new <directory> [--json]\n  micro [--api URL] pull <slug> [directory] [--json]\n  micro [--api URL] build [--json]\n  micro [--api URL] dev [--port PORT] [--json]\n  micro [--api URL] signup --email <email> [--password-stdin] [--json]\n  micro [--api URL] login\n  micro [--api URL] logout [--json]\n  micro [--api URL] account status [--wait] [--json]\n  micro [--api URL] deploy --preview [--json]\n  micro [--api URL] deploy --github [--json]\n  micro [--api URL] deploy <slug> [--accept-price-changes] [--accept-live-products] [--json]\n  micro [--api URL] github link --repository OWNER/REPO --environment NAME --ref REF --slug SLUG [--json]\n  micro [--api URL] github bindings [--json]\n  micro [--api URL] github revoke <binding-id> [--json]\n  micro [--api URL] projects [--json]\n  micro [--api URL] status [--json]\n  micro [--api URL] deployments [--json]\n  micro [--api URL] logs [--since 30m] [--json]\n  micro [--api URL] users [--json]\n  micro [--api URL] users disable <user-id> --confirm [--json]\n  micro [--api URL] users enable <user-id> [--json]\n  micro [--api URL] users revoke-sessions <user-id> --confirm [--json]\n  micro [--api URL] records [--json]\n  micro [--api URL] records delete <environment> <collection> <scope> <key> --version <version> --confirm [--json]\n  micro [--api URL] purchases [--json]\n  micro [--api URL] audit [--json]\n  micro [--api URL] export [<resource> [--limit 100 --offset 0]] [--json]\n  micro [--api URL] retention [--json]\n  micro [--api URL] retention set --record-days DAYS [--automatic] --confirm [--json]\n  micro [--api URL] retention prune --expected-records COUNT --confirm [--json]\n  micro [--api URL] rollback <deployment> [--json]\n  micro [--api URL] products [sync [--accept-price-changes] [--accept-live-products]] [--json]\n  micro [--api URL] files [--json]\n  micro [--api URL] files upload <id> <path> [--entitlement <id>|--public] [--json]\n  micro [--api URL] open\n"
 
 fun microRunner(): string {
     val configured = linuxEnvironment("MICRO_RUNNER")
@@ -164,6 +164,88 @@ fun microExport(
     val endpoint = if (resourceName == "") "/export"
         else "/export/$resourceName?limit=$limit&offset=$offset"
     microLinkedRequest(api, endpoint)
+}
+
+fun microRetention(api: MicroApi): MicroResult = microLinkedRequest(api, "/retention")
+
+fun microSetRetention(
+    api: MicroApi,
+    recordDays: int,
+    automatic: bool,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed) return MicroResult(false, "Changing retention requires --confirm.")
+    if (!microRetentionPolicyValid(recordDays, automatic))
+        return MicroResult(false, "Use 0 to keep records forever, or 30 through 3650 days; automatic pruning needs a finite policy.")
+    val current = microRetention(api)
+    if (!current.succeeded) return current
+    val parsed = jsonParse(current.structured)
+    if (!parsed.succeeded || !parsed.value.isObject() ||
+        !parsed.value.get("version").intAvailable())
+        return MicroResult(false, "micro.do returned an invalid retention policy.")
+    val project = microLocalProject()
+    if (!project.valid)
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "PUT", "/api/v1/projects/${project.slug}/retention",
+        jsonStringify(jsonObject(
+            ["record_days", "automatic", "expected_version"],
+            [jsonInteger(recordDays), jsonBoolean(automatic),
+             jsonInteger(parsed.value.getInt("version"))]
+        )), "application/json", credentials.accessToken, 1048576,
+        [HttpHeader("X-Micro-Confirm-Retention", "true")]
+    )
+    if (!response.succeeded) return MicroResult(false, response.message)
+    val mode = if (recordDays == 0) "keep records forever"
+        else if (automatic) "automatically prune records older than $recordDays days"
+        else "preview records older than $recordDays days for manual pruning"
+    MicroResult(true, "Retention updated: $mode.", response.response.body)
+}
+
+fun microPruneRetention(
+    api: MicroApi,
+    expectedRecords: int,
+    confirmed: bool
+): MicroResult {
+    if (!confirmed) return MicroResult(false, "Record pruning requires --confirm.")
+    if (expectedRecords < 0)
+        return MicroResult(false, "Expected record count must be a non-negative integer.")
+    val current = microRetention(api)
+    if (!current.succeeded) return current
+    val parsed = jsonParse(current.structured)
+    if (!parsed.succeeded || !parsed.value.isObject() ||
+        !parsed.value.get("record_days").intAvailable() ||
+        !parsed.value.get("version").intAvailable() ||
+        !parsed.value.get("cutoff_epoch").intAvailable() ||
+        !parsed.value.get("eligible_records").intAvailable())
+        return MicroResult(false, "micro.do returned an invalid retention preview.")
+    val recordDays = parsed.value.getInt("record_days")
+    val eligible = parsed.value.getInt("eligible_records")
+    if (recordDays < 30)
+        return MicroResult(false, "Retention keeps records forever; set a finite policy before pruning.")
+    if (eligible != expectedRecords)
+        return MicroResult(false, "Retention preview has $eligible eligible records, not the expected $expectedRecords. Inspect `micro retention` again.")
+    val project = microLocalProject()
+    if (!project.valid)
+        return MicroResult(false, "This directory is not linked to a deployed Micro.")
+    val credentials = microRefreshCredentials(api)
+    if (!credentials.valid) return MicroResult(false, "Not logged in; run `micro login`.")
+    val response = microRequest(
+        api, "POST", "/api/v1/projects/${project.slug}/retention/prune",
+        jsonStringify(jsonObject(
+            ["expected_version", "cutoff_epoch", "expected_records"],
+            [jsonInteger(parsed.value.getInt("version")),
+             jsonInteger(parsed.value.getInt("cutoff_epoch")), jsonInteger(expectedRecords)]
+        )), "application/json", credentials.accessToken, 1048576,
+        [HttpHeader("X-Micro-Confirm-Prune", "true")]
+    )
+    if (response.succeeded) MicroResult(
+        true,
+        "Pruned $expectedRecords project record${if (expectedRecords == 1) "" else "s"}; purchases and entitlements were preserved.",
+        response.response.body
+    ) else MicroResult(false, response.message)
 }
 
 fun microUploadFile(
@@ -898,6 +980,36 @@ fun microRun(): MicroCommandResult {
             microPositiveInt(linuxArgument(index + 3), -1, 100),
             microNonNegativeInt(linuxArgument(index + 5), -1, 100000)
         )
+    else if (command == "retention" && index + 1 == count) microRetention(api)
+    else if (command == "retention" && index + 5 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--record-days" &&
+        linuxArgument(index + 4) == "--confirm")
+        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), false, true)
+    else if (command == "retention" && index + 6 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--record-days" &&
+        linuxArgument(index + 4) == "--automatic" &&
+        linuxArgument(index + 5) == "--confirm")
+        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), true, true)
+    else if (command == "retention" && index + 4 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--record-days")
+        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), false, false)
+    else if (command == "retention" && index + 5 == count &&
+        linuxArgument(index + 1) == "set" &&
+        linuxArgument(index + 2) == "--record-days" &&
+        linuxArgument(index + 4) == "--automatic")
+        microSetRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 3650), true, false)
+    else if (command == "retention" && index + 5 == count &&
+        linuxArgument(index + 1) == "prune" &&
+        linuxArgument(index + 2) == "--expected-records" &&
+        linuxArgument(index + 4) == "--confirm")
+        microPruneRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 10000), true)
+    else if (command == "retention" && index + 4 == count &&
+        linuxArgument(index + 1) == "prune" &&
+        linuxArgument(index + 2) == "--expected-records")
+        microPruneRetention(api, microNonNegativeInt(linuxArgument(index + 3), -1, 10000), false)
     else if (command == "rollback" && index + 2 == count)
         microProjectRollback(api, linuxArgument(index + 1))
     else if (command == "products" && index + 1 == count) microProducts(api)
