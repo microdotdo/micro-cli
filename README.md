@@ -1,6 +1,7 @@
 # micro CLI
 
-`micro` builds, previews, deploys, and maintains full-stack WebAssembly sites on [micro.do](https://micro.do).
+`micro` builds, previews, deploys, and maintains small sites with managed auth,
+data, files, email, and payments on [micro.do](https://micro.do).
 
 The command tree is defined with
 [`abla-cli`](https://github.com/AndreBaltazar8/abla-cli). Root and subcommand
@@ -11,17 +12,17 @@ argument parser; run `micro <command> --help` for the exact contract.
 
 ## Install
 
-Install the complete local toolchain (CLI, compiler, and development runner):
-
-```sh
-curl -fsSL https://micro.do/install | sh
-micro doctor
-```
-
-On macOS, the same toolchain is available through Homebrew:
+Install the complete local toolchain on macOS or Linux:
 
 ```sh
 brew install microdotdo/tap/micro
+micro doctor
+```
+
+The guided script checks for Homebrew and performs the same verified install:
+
+```sh
+curl -fsSL https://micro.do/install | sh
 micro doctor
 ```
 
