@@ -11,6 +11,23 @@ argument parser; run `micro <command> --help` for the exact contract.
 
 ## Install
 
+Install the complete local toolchain (CLI, compiler, and development runner):
+
+```sh
+curl -fsSL https://micro.do/install | sh
+micro doctor
+```
+
+On macOS, the same toolchain is available through Homebrew:
+
+```sh
+brew install microdotdo/tap/micro
+micro doctor
+```
+
+The manual instructions below install only the `micro` executable and are
+primarily useful for release verification.
+
 Linux x86-64 and macOS releases include a checksum alongside each executable.
 For Linux:
 

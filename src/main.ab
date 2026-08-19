@@ -33,6 +33,79 @@ fun microDev(port: int = 8787): MicroResult {
     ) else MicroResult(false, "The development runner exited with status $status.")
 }
 
+class MicroToolCheck(
+    val available: bool,
+    val executable: string,
+    val version: string
+)
+
+fun microCheckTool(executable: string): MicroToolCheck {
+    val checked = linuxCommand(executable).argument("--version").capture()
+    MicroToolCheck(checked.status == 0, executable, checked.output)
+}
+
+fun microToolCheckJson(check: MicroToolCheck): Json = jsonObject(
+    ["available", "executable", "version"],
+    [jsonBoolean(check.available), jsonString(check.executable),
+     jsonString(check.version)]
+)
+
+fun microDoctor(api: MicroApi): MicroResult {
+    val compiler = microCheckTool(microCompiler())
+    val runner = microCheckTool(microRunner())
+    val platform = microPlatformStatus(api)
+    val credentials = microRefreshCredentials(api)
+    var account = jsonObject(
+        ["authenticated", "email_verified"],
+        [jsonBoolean(false), jsonBoolean(false)]
+    )
+    if (credentials.valid) {
+        val response = microRequest(
+            api, "GET", "/api/v1/auth/status", "", "application/json",
+            credentials.accessToken
+        )
+        if (response.succeeded) {
+            val parsed = jsonParse(response.response.body)
+            if (parsed.succeeded && parsed.value.isObject()) account = jsonObject(
+                ["authenticated", "email_verified"],
+                [jsonBoolean(true),
+                 jsonBoolean(parsed.value.get("email_verified").asBoolean())]
+            )
+        }
+    }
+    val local = microLocalProject()
+    val hasSource = path("app.ab").exists() || path("public/index.html").exists()
+    val ready = compiler.available && runner.available && platform.succeeded
+    val result = jsonStringify(jsonObject(
+        ["ok", "cli_version", "toolchain", "platform", "account", "project",
+         "ready_for_local_development"],
+        [jsonBoolean(ready), jsonString("0.9.0"),
+         jsonObject(
+            ["compiler", "runner"],
+            [microToolCheckJson(compiler), microToolCheckJson(runner)]
+         ),
+         jsonObject(
+            ["reachable"], [jsonBoolean(platform.succeeded)]
+         ),
+         account,
+         jsonObject(
+            ["source_found", "linked", "slug"],
+            [jsonBoolean(hasSource), jsonBoolean(local.valid),
+             jsonString(if (local.valid) local.slug else "")]
+         ),
+         jsonBoolean(ready)]
+    ))
+    if (ready) MicroResult(
+        true,
+        "Micro is ready for local development.${if (!credentials.valid) " Run `micro login` before production deployment." else ""}",
+        result
+    ) else MicroResult(
+        false,
+        "Micro is not ready. Install the missing compiler or runner, then run `micro doctor` again.",
+        result
+    )
+}
+
 fun microProducts(api: MicroApi): MicroResult = microLinkedRequest(api, "/products")
 
 fun microSyncProducts(
@@ -1432,6 +1505,7 @@ fun microRun(): MicroCommandResult {
     else if (schema.isCommand("remix"))
         microRemix(api, schema.argument(0), schema.argument(1, schema.argument(0)))
     else if (schema.isCommand("build")) microBuildProject(path("."))
+    else if (schema.isCommand("doctor")) microDoctor(api)
     else if (schema.isCommand("dev") && schema.has("port"))
         microDev(microParsePort(schema.value("port"), -1))
     else if (schema.isCommand("dev")) microDev()

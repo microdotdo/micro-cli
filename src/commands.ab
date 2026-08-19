@@ -19,7 +19,7 @@ fun microCommand(name: string, description: string,
     cliCommand(name, description, [], options, arguments, commands)
 
 fun microCli(): CliApp = cliApplication(
-    "micro", "0.8.2", "Build, deploy, and operate small full-stack sites on micro.do",
+    "micro", "0.9.0", "Build, deploy, and operate small full-stack sites on micro.do",
     [
         cliOption("api", "--api", "", "URL", "micro.do API base URL", false, true, "https://micro.do"),
         cliFlag("json", "--json", "", "Emit machine-readable JSON", true)
@@ -30,6 +30,7 @@ fun microCli(): CliApp = cliApplication(
         microCommand("remix", "Copy a curated Micro for local editing", [microArg("entry", "Gallery entry"), microArg("directory", "Destination directory", false)]),
         microCommand("build", "Build and validate the current Micro"),
         microCommand("dev", "Run the current Micro locally", [], [microOpt("port", "--port", "PORT", "Local port")]),
+        microCommand("doctor", "Check the local toolchain, platform, account, and project"),
         microCommand("signup", "Create a Micro account securely", [], [microOpt("email", "--email", "EMAIL", "Account email", true), microFlag("password-stdin", "--password-stdin", "Read the password from standard input")]),
         microCommand("login", "Pair this CLI with a Micro account"),
         microCommand("logout", "Revoke the CLI session and remove local credentials"),

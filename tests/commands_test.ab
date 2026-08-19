@@ -37,7 +37,8 @@ fun main: int {
     val upload = app.parse(["files", "upload", "--help"])
     val valid = app.parse(["files", "upload", "asset", "archive.zip", "--entitlement", "downloads", "--json"])
     val recordVersion = app.parse(["records", "delete", "production", "notes", "user", "welcome", "--version", "3", "--confirm"])
-    if (validateHelp(app, app.commands, []) != 76) 1
+    val doctor = app.parse(["doctor", "--json"])
+    if (validateHelp(app, app.commands, []) != 77) 1
     else if (!deploy.succeeded || !contains(deploy.message, "--accept-live-products") ||
         !contains(deploy.message, "--prebuilt")) 2
     else if (!restore.succeeded || !contains(restore.message, "<backup-id>") ||
@@ -50,5 +51,6 @@ fun main: int {
     else if (app.parse(["backups", "restore", "id", "--backup-sha256", "a"]).succeeded) 9
     else if (!recordVersion.succeeded || !recordVersion.isCommand("records delete")) 10
     else if (recordVersion.value("version") != "3" || !recordVersion.has("confirm")) 11
+    else if (!doctor.succeeded || !doctor.isCommand("doctor") || !doctor.has("json")) 12
     else 0
 }
