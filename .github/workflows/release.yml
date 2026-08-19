@@ -13,7 +13,8 @@ permissions:
 
 env:
   ABLAC_COMMIT: 217d7801d22adbcd381e1aeba4c0942108f21935
-  RUNNER_COMMIT: b1ec4d7a158fd78f300ea6eba53b07b9b35c4155
+  RUNNER_RELEASE: v0.9.0
+  RUNNER_SHA256: 1f7ddac305e63562a8ac5317d956d19907c3fffc06132471fd586f63c43c35d4
   RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
@@ -57,17 +58,13 @@ jobs:
             '
           cd build
           sha256sum micro-linux-x86_64 > micro-linux-x86_64.sha256
-      - name: Build the pinned static Linux runner
+      - name: Fetch the pinned static Linux runner
         run: |
-          git clone --filter=blob:none --no-checkout https://github.com/microdotdo/micro "$RUNNER_TEMP/micro"
-          git -C "$RUNNER_TEMP/micro" checkout "$RUNNER_COMMIT"
-          rustup target add x86_64-unknown-linux-musl
-          cargo build --locked --release -p micro-runner \
-            --manifest-path "$RUNNER_TEMP/micro/Cargo.toml" \
-            --target x86_64-unknown-linux-musl
-          install -m 0755 \
-            "$RUNNER_TEMP/micro/target/x86_64-unknown-linux-musl/release/micro-runner" \
-            build/micro-runner-linux-x86_64
+          curl --fail --location --silent --show-error \
+            "https://github.com/microdotdo/micro-cli/releases/download/$RUNNER_RELEASE/micro-runner-linux-x86_64-static" \
+            -o build/micro-runner-linux-x86_64
+          echo "$RUNNER_SHA256  build/micro-runner-linux-x86_64" | sha256sum --check
+          chmod 0755 build/micro-runner-linux-x86_64
           file build/micro-runner-linux-x86_64 | grep -F 'static-pie linked'
           build/micro-runner-linux-x86_64 --version | grep -Fx 'micro-runner 0.1.0'
           (cd build && sha256sum micro-runner-linux-x86_64 > micro-runner-linux-x86_64.sha256)
