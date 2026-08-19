@@ -273,7 +273,7 @@ fun microRequest(
     extraHeaders: array<HttpHeader> = []
 ): MicroHttpResult {
     val headers: array<HttpHeader> = [
-        HttpHeader("User-Agent", "micro-cli/0.10.1"),
+        HttpHeader("User-Agent", "micro-cli/0.10.2"),
         HttpHeader("Content-Type", contentType)
     ]
     if (bearer != "") headers.append(HttpHeader("Authorization", "Bearer $bearer"))
