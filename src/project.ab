@@ -475,13 +475,24 @@ fun microCompileServer(root: Path): MicroResult {
     if (!root.child("micro-build.ab").writeTextAtomic(driver))
         return MicroResult(false, "Could not write the temporary Abla build driver.")
     val command = linuxCommand(microCompiler())
+    // The driver only evaluates the typed $wasm build subparser. Emitting an
+    // object keeps the complete programmable build graph while avoiding a
+    // disposable native link, so Micro installations do not need a host C
+    // compiler just to build a site.
     command.argument("build")
     command.argument("micro-build.ab")
     command.argument("-o")
     command.argument(".micro/build-driver")
+    command.argument("--emit")
+    command.argument("object")
     command.argument("--no-cache")
     val status = command.run()
     root.child("micro-build.ab").remove()
+    root.child(".micro/build-driver").remove()
+    root.child(".micro/build-driver.abi.json").remove()
+    root.child(".micro/build-driver.ll").remove()
+    root.child(".micro/build-driver.o").remove()
+    root.child(".micro/build-driver.o.bc").remove()
     if (temporaryManifest) projectManifest.remove()
     if (status == 0 && root.child(".micro/build/app.wasm").exists())
         MicroResult(true, "")

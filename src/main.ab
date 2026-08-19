@@ -79,7 +79,7 @@ fun microDoctor(api: MicroApi): MicroResult {
     val result = jsonStringify(jsonObject(
         ["ok", "cli_version", "toolchain", "platform", "account", "project",
          "ready_for_local_development"],
-        [jsonBoolean(ready), jsonString("0.9.0"),
+        [jsonBoolean(ready), jsonString("0.10.0"),
          jsonObject(
             ["compiler", "runner"],
             [microToolCheckJson(compiler), microToolCheckJson(runner)]

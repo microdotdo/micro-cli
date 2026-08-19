@@ -13,6 +13,7 @@ permissions:
 
 env:
   ABLAC_COMMIT: 217d7801d22adbcd381e1aeba4c0942108f21935
+  RUNNER_COMMIT: b1ec4d7a158fd78f300ea6eba53b07b9b35c4155
   RELEASE_TAG: ${{ inputs.tag }}
 
 jobs:
@@ -36,18 +37,91 @@ jobs:
       - name: Link portable Linux executable
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends clang lld libssl-dev
+          sudo apt-get install -y --no-install-recommends clang lld libssl-dev musl-tools
           clang -fuse-ld=lld build/micro.o -lssl -lcrypto -lpthread -o build/micro-linux-x86_64
           strip build/micro-linux-x86_64
           test "$(build/micro-linux-x86_64 --version)" = "micro ${RELEASE_TAG#v}"
           cd build
           sha256sum micro-linux-x86_64 > micro-linux-x86_64.sha256
+      - name: Build the pinned static Linux runner
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/microdotdo/micro "$RUNNER_TEMP/micro"
+          git -C "$RUNNER_TEMP/micro" checkout "$RUNNER_COMMIT"
+          rustup target add x86_64-unknown-linux-musl
+          cargo build --locked --release -p micro-runner \
+            --manifest-path "$RUNNER_TEMP/micro/Cargo.toml" \
+            --target x86_64-unknown-linux-musl
+          install -m 0755 \
+            "$RUNNER_TEMP/micro/target/x86_64-unknown-linux-musl/release/micro-runner" \
+            build/micro-runner-linux-x86_64
+          file build/micro-runner-linux-x86_64 | grep -F 'static-pie linked'
+          build/micro-runner-linux-x86_64 --version | grep -Fx 'micro-runner 0.1.0'
+          (cd build && sha256sum micro-runner-linux-x86_64 > micro-runner-linux-x86_64.sha256)
+      - name: Package the self-contained Linux toolchain
+        run: |
+          docker run --rm \
+            -v "$PWD:/micro-cli" \
+            -v "$RUNNER_TEMP/ablac:/ablac:ro" \
+            ubuntu:22.04@sha256:3b06811b2afd352be909dd088a004166d665dc76d38b13eada33522a9d915c6f \
+            bash -ceu '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                binaryen ca-certificates curl gnupg patchelf
+              curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key \
+                -o /tmp/llvm.asc
+              fingerprint=$(gpg --show-keys --with-colons /tmp/llvm.asc |
+                awk -F: '\''$1 == "fpr" { print $10; exit }'\'')
+              test "$fingerprint" = 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421
+              gpg --dearmor -o /usr/share/keyrings/apt.llvm.org.gpg \
+                /tmp/llvm.asc
+              echo "deb [signed-by=/usr/share/keyrings/apt.llvm.org.gpg] http://apt.llvm.org/jammy/ llvm-toolchain-jammy-21 main" \
+                > /etc/apt/sources.list.d/llvm.list
+              apt-get update
+              apt-get install -y --no-install-recommends \
+                clang-21 llvm-21 lld-21 libssl3
+              export PATH=/usr/lib/llvm-21/bin:$PATH
+              /micro-cli/tools/package-linux-toolchain.sh \
+                /micro-cli/build/micro-linux-x86_64 \
+                /micro-cli/build/micro-runner-linux-x86_64 \
+                /ablac/build/ablac.bin \
+                /ablac \
+                /micro-cli/build/micro-toolchain-linux-x86_64.tar.gz
+            '
+      - name: Exercise the bundle without Nix or Homebrew
+        run: |
+          docker run --rm \
+            -v "$PWD/build:/release:ro" \
+            ubuntu:22.04@sha256:3b06811b2afd352be909dd088a004166d665dc76d38b13eada33522a9d915c6f \
+            bash -ceu '
+              mkdir -p /opt/micro /work
+              tar -xzf /release/micro-toolchain-linux-x86_64.tar.gz \
+                -C /opt/micro --strip-components=1
+              export PATH=/opt/micro/bin:$PATH
+              test "$(micro --version)" = "micro '${RELEASE_TAG#v}'"
+              test "$(ablac --version)" = "ablac 0.2.6"
+              test "$(micro-runner --version)" = "micro-runner 0.1.0"
+              mkdir -p /work/hello/public
+              printf "fun main: int = 0\\n" > /work/hello/app.ab
+              printf "<!doctype html><title>Portable Micro test</title>\\n" \
+                > /work/hello/public/index.html
+              cd /work/hello
+              micro build
+              test -s .micro/build/app.wasm
+              test ! -e .micro/build-driver
+              test ! -e .micro/build-driver.o
+              test ! -e .micro/build-driver.ll
+            '
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: micro-linux-x86_64
           path: |
             build/micro-linux-x86_64
             build/micro-linux-x86_64.sha256
+            build/micro-runner-linux-x86_64
+            build/micro-runner-linux-x86_64.sha256
+            build/micro-toolchain-linux-x86_64.tar.gz
+            build/micro-toolchain-linux-x86_64.tar.gz.sha256
           if-no-files-found: error
 
   macos:
@@ -106,9 +180,11 @@ jobs:
           merge-multiple: true
       - name: Verify release payload
         run: |
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 6
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 10
           cd dist
           sha256sum --check micro-linux-x86_64.sha256
+          sha256sum --check micro-runner-linux-x86_64.sha256
+          sha256sum --check micro-toolchain-linux-x86_64.tar.gz.sha256
           sha256sum --check micro-macos-arm64.sha256
           sha256sum --check micro-macos-x86_64.sha256
       - name: Publish immutable release
@@ -118,6 +194,10 @@ jobs:
           gh release create "$RELEASE_TAG"
           dist/micro-linux-x86_64
           dist/micro-linux-x86_64.sha256
+          dist/micro-runner-linux-x86_64
+          dist/micro-runner-linux-x86_64.sha256
+          dist/micro-toolchain-linux-x86_64.tar.gz
+          dist/micro-toolchain-linux-x86_64.tar.gz.sha256
           dist/micro-macos-arm64
           dist/micro-macos-arm64.sha256
           dist/micro-macos-x86_64

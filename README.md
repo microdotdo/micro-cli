@@ -12,19 +12,25 @@ argument parser; run `micro <command> --help` for the exact contract.
 
 ## Install
 
-Install the complete local toolchain on macOS or Linux:
+Install the complete local toolchain on Linux without Homebrew:
+
+```sh
+curl -fsSL https://micro.do/install | sh
+micro doctor
+```
+
+On macOS, use the signed, checksum-pinned Homebrew formula:
 
 ```sh
 brew install microdotdo/tap/micro
 micro doctor
 ```
 
-The guided script checks for Homebrew and performs the same verified install:
-
-```sh
-curl -fsSL https://micro.do/install | sh
-micro doctor
-```
+The Linux installer downloads one versioned archive containing `micro`, the
+matching Abla compiler and standard library, the Wasm linker, and the local
+runner. It verifies the published SHA-256 checksum, installs under
+`~/.local/share/micro`, and links the three public commands into
+`~/.local/bin`. It does not install Homebrew or modify system packages.
 
 The manual instructions below install only the `micro` executable and are
 primarily useful for release verification.

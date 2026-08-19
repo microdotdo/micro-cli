@@ -19,7 +19,7 @@ fun microCommand(name: string, description: string,
     cliCommand(name, description, [], options, arguments, commands)
 
 fun microCli(): CliApp = cliApplication(
-    "micro", "0.9.0", "Build, deploy, and operate small full-stack sites on micro.do",
+    "micro", "0.10.0", "Build, deploy, and operate small full-stack sites on micro.do",
     [
         cliOption("api", "--api", "", "URL", "micro.do API base URL", false, true, "https://micro.do"),
         cliFlag("json", "--json", "", "Emit machine-readable JSON", true)
