@@ -12,11 +12,27 @@ argument parser; run `micro <command> --help` for the exact contract.
 
 ## Install
 
-Install the complete local toolchain on Linux without Homebrew:
+Choose the installation that matches how you build your Micro.
+
+The lightweight CLI is enough for static sites, prebuilt Wasm from Rust or any
+other toolchain, deployments, and project administration:
 
 ```sh
-curl -fsSL https://micro.do/install | sh
+curl -fsSL https://micro.do/install | sh -s -- cli
 micro doctor
+```
+
+Add the local runner when you want `micro dev` while keeping your own language
+toolchain:
+
+```sh
+curl -fsSL https://micro.do/install | sh -s -- runtime
+```
+
+Or install the complete self-contained Abla toolchain:
+
+```sh
+curl -fsSL https://micro.do/install | sh -s -- abla
 ```
 
 On macOS, use the signed, checksum-pinned Homebrew formula:
@@ -26,11 +42,12 @@ brew install microdotdo/tap/micro
 micro doctor
 ```
 
-The Linux installer downloads one versioned archive containing `micro`, the
-matching Abla compiler and standard library, the Wasm linker, and the local
-runner. It verifies the published SHA-256 checksum, installs under
-`~/.local/share/micro`, and links the three public commands into
-`~/.local/bin`. It does not install Homebrew or modify system packages.
+Every Linux mode verifies its published SHA-256 checksum and installs under
+`~/.local/share/micro`, with public commands linked into `~/.local/bin`.
+`cli` installs only the standalone Micro executable, `runtime` adds the static
+local runner, and `abla` installs the matching compiler, standard library,
+LLVM-based Wasm tools, and runner. None installs Homebrew or modifies system
+packages. Homebrew currently provides the complete Abla toolchain.
 
 The manual instructions below install only the `micro` executable and are
 primarily useful for release verification.
@@ -69,7 +86,10 @@ cd my-site
 micro dev
 ```
 
-`micro dev` builds the exact production bundle and starts the official runner
+`micro build` accepts static assets on their own, an already-built
+`.micro/build/app.wasm` from Rust or another toolchain, or compiles `app.ab`
+when the optional Abla toolchain is installed. `micro dev` builds that exact
+production bundle and starts the optional official runner
 on `http://127.0.0.1:8787`. Its app users, data, purchases, entitlements, and
 purchase events are disposable in-memory fixtures. Override the runner binary
 with `MICRO_RUNNER` and the compiler with `MICRO_ABLAC` when developing those

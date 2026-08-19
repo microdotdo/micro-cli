@@ -74,15 +74,26 @@ fun microDoctor(api: MicroApi): MicroResult {
         }
     }
     val local = microLocalProject()
-    val hasSource = path("app.ab").exists() || path("public/index.html").exists()
-    val ready = compiler.available && runner.available && platform.succeeded
+    val hasAblaSource = path("app.ab").exists()
+    val hasSource = hasAblaSource || path("public/index.html").exists() ||
+        path(".micro/build/app.wasm").exists()
+    // Abla and the local runner are optional capabilities. A static site or a
+    // project whose Wasm was built by Rust (or another toolchain) must not make
+    // the lightweight Micro CLI installation look broken.
+    val readyForBuild = !hasAblaSource || compiler.available
+    val readyForLocalDevelopment = hasSource && readyForBuild && runner.available
+    val ready = platform.succeeded && readyForBuild
     val result = jsonStringify(jsonObject(
-        ["ok", "cli_version", "toolchain", "platform", "account", "project",
-         "ready_for_local_development"],
+        ["ok", "cli_version", "toolchain", "requirements", "platform",
+         "account", "project", "ready_for_build", "ready_for_local_development"],
         [jsonBoolean(ready), jsonString("0.10.0"),
          jsonObject(
             ["compiler", "runner"],
             [microToolCheckJson(compiler), microToolCheckJson(runner)]
+         ),
+         jsonObject(
+            ["abla_compiler_required", "local_runner_required_for_dev"],
+            [jsonBoolean(hasAblaSource), jsonBoolean(hasSource)]
          ),
          jsonObject(
             ["reachable"], [jsonBoolean(platform.succeeded)]
@@ -93,15 +104,17 @@ fun microDoctor(api: MicroApi): MicroResult {
             [jsonBoolean(hasSource), jsonBoolean(local.valid),
              jsonString(if (local.valid) local.slug else "")]
          ),
-         jsonBoolean(ready)]
+         jsonBoolean(readyForBuild), jsonBoolean(readyForLocalDevelopment)]
     ))
     if (ready) MicroResult(
         true,
-        "Micro is ready for local development.${if (!credentials.valid) " Run `micro login` before production deployment." else ""}",
+        "Micro CLI is ready.${if (readyForLocalDevelopment) " This project is ready for local development." else if (hasSource && !runner.available) " Install the optional runner to use `micro dev`." else ""}${if (!credentials.valid) " Run `micro login` before production deployment." else ""}",
         result
     ) else MicroResult(
         false,
-        "Micro is not ready. Install the missing compiler or runner, then run `micro doctor` again.",
+        if (!platform.succeeded)
+            "The Micro platform is not reachable. Check the connection, then run `micro doctor` again."
+        else "This Abla project needs the optional Abla toolchain. Install it, then run `micro doctor` again.",
         result
     )
 }
