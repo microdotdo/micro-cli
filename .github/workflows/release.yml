@@ -12,7 +12,6 @@ permissions:
   contents: read
 
 env:
-  ABLAC_COMMIT: f41fef452bce52e6b6a5795121fef70852f733dc
   RUNNER_RELEASE: v0.9.0
   RUNNER_SHA256: 1f7ddac305e63562a8ac5317d956d19907c3fffc06132471fd586f63c43c35d4
   RELEASE_TAG: ${{ inputs.tag }}
@@ -24,17 +23,13 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.tag }}
-      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
-      - name: Build public Abla compiler revision
-        run: |
-          git clone --filter=blob:none --no-checkout https://github.com/AndreBaltazar8/ablac "$RUNNER_TEMP/ablac"
-          git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
-          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac'"
+      - uses: AndreBaltazar8/setup-abla@b21e1290aa49862e7bf187dc84b6b3511f4b571e # v1.0.0
+        with:
+          version: '0.2.10'
       - name: Test and compile CLI
-        run: >-
-          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run
-          "'$RUNNER_TEMP/ablac/build/ablac' package update --project . &&
-          make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
+        run: |
+          ablac package update --project .
+          make test build COMPILER=ablac
       - name: Link portable Linux executable
         run: |
           docker run --rm \
@@ -72,7 +67,7 @@ jobs:
         run: |
           docker run --rm \
             -v "$PWD:/micro-cli" \
-            -v "$RUNNER_TEMP/ablac:/ablac:ro" \
+            -v "$ABLA_HOME:/abla:ro" \
             ubuntu:22.04@sha256:3b06811b2afd352be909dd088a004166d665dc76d38b13eada33522a9d915c6f \
             bash -ceu '
               export DEBIAN_FRONTEND=noninteractive
@@ -95,8 +90,8 @@ jobs:
               /micro-cli/tools/package-linux-toolchain.sh \
                 /micro-cli/build/micro-linux-x86_64 \
                 /micro-cli/build/micro-runner-linux-x86_64 \
-                /ablac/build/ablac.bin \
-                /ablac \
+                /abla/libexec/ablac.bin \
+                /abla/share/abla \
                 /micro-cli/build/micro-toolchain-linux-x86_64.tar.gz
             '
       - name: Exercise the bundle without Nix or Homebrew
@@ -110,7 +105,7 @@ jobs:
                 -C /opt/micro --strip-components=1
               export PATH=/opt/micro/bin:$PATH
               test "$(micro --version)" = "micro '${RELEASE_TAG#v}'"
-              test "$(ablac --version)" = "ablac 0.2.7"
+              test "$(ablac --version)" = "ablac 0.2.10"
               test "$(micro-runner --version)" = "micro-runner 0.1.0"
               mkdir -p /work/hello/public
               printf "@export(\\042micro_sign_extension_probe\\042)\\nfun signExtensionProbe(value: i8): int = value\\n\\nfun main: int = 0\\n" \
@@ -150,22 +145,13 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           ref: ${{ inputs.tag }}
-      - name: Install the native Abla toolchain
-        env:
-          HOMEBREW_NO_AUTO_UPDATE: "1"
-        run: |
-          brew install llvm@21 lld@21 openssl@3
-          echo "$(brew --prefix llvm@21)/bin" >> "$GITHUB_PATH"
-          echo "$(brew --prefix lld@21)/bin" >> "$GITHUB_PATH"
-      - name: Build public Abla compiler revision
-        run: |
-          git clone --filter=blob:none --no-checkout https://github.com/AndreBaltazar8/ablac "$RUNNER_TEMP/ablac"
-          git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
-          make -C "$RUNNER_TEMP/ablac"
+      - uses: AndreBaltazar8/setup-abla@b21e1290aa49862e7bf187dc84b6b3511f4b571e # v1.0.0
+        with:
+          version: '0.2.10'
       - name: Test and compile native CLI
         run: |
-          "$RUNNER_TEMP/ablac/build/ablac" package update --project .
-          make test build ABLAC_DIR="$RUNNER_TEMP/ablac" COMPILER="$RUNNER_TEMP/ablac/build/ablac"
+          ablac package update --project .
+          make test build COMPILER=ablac
           test "$(build/micro --version)" = "micro ${RELEASE_TAG#v}"
           test "$(uname -m)" = "${{ matrix.architecture }}"
           otool -L build/micro | grep -F '/opt/openssl@3/lib/libssl.3.dylib'

@@ -52,7 +52,15 @@ ln -s ../libexec/llc "$bundle/bin/llc"
 ln -s ../libexec/clang "$bundle/bin/clang"
 cp -R "$abla_root/runtime" "$abla_root/stdlib" "$bundle/share/abla/"
 cp "$(dirname "$0")/../LICENSE" "$bundle/share/licenses/micro-cli.txt"
-cp "$abla_root/LICENSE" "$bundle/share/licenses/abla.txt"
+if [[ -r $abla_root/LICENSE ]]; then
+    abla_license="$abla_root/LICENSE"
+elif [[ -r $abla_root/../licenses/abla.txt ]]; then
+    abla_license="$abla_root/../licenses/abla.txt"
+else
+    printf 'missing Abla license beside sysroot: %s\n' "$abla_root" >&2
+    exit 1
+fi
+cp "$abla_license" "$bundle/share/licenses/abla.txt"
 chmod 0755 "$bundle/bin/micro" "$bundle/bin/micro-runner" \
     "$bundle/libexec/ablac.bin" "$bundle/libexec/lld"
 chmod 0755 "$bundle/libexec/wasm-opt" "$bundle/libexec/opt" \

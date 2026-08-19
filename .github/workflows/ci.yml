@@ -10,18 +10,12 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    env:
-      ABLAC_COMMIT: 946d112a649c4f4fc6f4e156251c10c2d2095985
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
-      - name: Build Abla compiler
-        run: |
-          git clone --filter=blob:none --no-checkout https://github.com/AndreBaltazar8/ablac "$RUNNER_TEMP/ablac"
-          git -C "$RUNNER_TEMP/ablac" checkout "$ABLAC_COMMIT"
-          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run "make -C '$RUNNER_TEMP/ablac'"
+      - uses: AndreBaltazar8/setup-abla@b21e1290aa49862e7bf187dc84b6b3511f4b571e # v1.0.0
+        with:
+          version: '0.2.10'
       - name: Test and build CLI
-        run: >-
-          nix-shell "$RUNNER_TEMP/ablac/shell.nix" --run
-          "'$RUNNER_TEMP/ablac/build/ablac' package update --project . &&
-          make test build ABLAC_DIR='$RUNNER_TEMP/ablac' COMPILER='$RUNNER_TEMP/ablac/build/ablac'"
+        run: |
+          ablac package update --project .
+          make test build COMPILER=ablac
